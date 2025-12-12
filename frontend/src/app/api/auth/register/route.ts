@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, initializeDatabase } from '@/lib/db';
+import { getDb, initializeDatabase } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -10,6 +10,7 @@ export async function POST(request: NextRequest) {
         // 테이블 초기화 (첫 요청 시)
         await initializeDatabase();
 
+        const sql = getDb();
         const { email, password, name } = await request.json();
 
         if (!email || !password) {
@@ -47,3 +48,4 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: '회원가입 실패: ' + error.message }, { status: 500 });
     }
 }
+

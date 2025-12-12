@@ -1,11 +1,18 @@
 import { neon } from '@neondatabase/serverless';
 
-const sql = neon(process.env.DATABASE_URL!);
-
-export { sql };
+// 런타임에만 DB 연결 (빌드 시점 에러 방지)
+export function getDb() {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+        throw new Error('DATABASE_URL environment variable is not set');
+    }
+    return neon(connectionString);
+}
 
 // 테이블 초기화 함수
 export async function initializeDatabase() {
+    const sql = getDb();
+
     await sql`
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,

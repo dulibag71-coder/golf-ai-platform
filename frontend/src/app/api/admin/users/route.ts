@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { sql, initializeDatabase } from '@/lib/db';
+import { NextResponse } from 'next/server';
+import { getDb, initializeDatabase } from '@/lib/db';
 
 export async function GET() {
     try {
         await initializeDatabase();
 
+        const sql = getDb();
         const users = await sql`
             SELECT id, email, name, role, is_active, created_at 
             FROM users 

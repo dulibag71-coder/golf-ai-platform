@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, initializeDatabase } from '@/lib/db';
+import { getDb, initializeDatabase } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
     try {
         await initializeDatabase();
 
+        const sql = getDb();
         const { email, password } = await request.json();
 
         if (!email || !password) {

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, initializeDatabase } from '@/lib/db';
+import { getDb, initializeDatabase } from '@/lib/db';
 
 // 대기중인 결제 목록 조회
 export async function GET() {
     try {
         await initializeDatabase();
 
+        const sql = getDb();
         const payments = await sql`
             SELECT p.*, u.email 
             FROM payments p 
@@ -24,6 +25,7 @@ export async function GET() {
 // 결제 승인
 export async function POST(request: NextRequest) {
     try {
+        const sql = getDb();
         const { paymentId } = await request.json();
 
         await sql`UPDATE payments SET status = 'approved' WHERE id = ${paymentId}`;
