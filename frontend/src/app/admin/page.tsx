@@ -54,25 +54,28 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (!isAuthenticated) return;
 
-        if (!token) {
-            window.location.href = '/login';
-            return;
-        }
-
-        Promise.all([
-            api.get('/admin/payments/pending', token).catch(() => []),
-            api.get('/admin/users', token).catch(() => [])
-        ]).then(([paymentsData, usersData]) => {
-            setPayments(paymentsData || []);
-            setUsers(usersData || []);
-            setStats({
-                totalUsers: usersData?.length || 0,
-                totalSwings: 127, // Mock
-                pendingPayments: paymentsData?.length || 0,
-                revenue: 890000 // Mock
-            });
+        // 관리자 비밀번호로 인증되면 바로 데이터 로드 (토큰 체크 제거)
+        const loadData = async () => {
+            try {
+                const [paymentsData, usersData] = await Promise.all([
+                    token ? api.get('/admin/payments/pending', token).catch(() => []) : Promise.resolve([]),
+                    token ? api.get('/admin/users', token).catch(() => []) : Promise.resolve([])
+                ]);
+                setPayments(paymentsData || []);
+                setUsers(usersData || []);
+                setStats({
+                    totalUsers: usersData?.length || 0,
+                    totalSwings: 127,
+                    pendingPayments: paymentsData?.length || 0,
+                    revenue: 890000
+                });
+            } catch (error) {
+                console.log('API 연결 대기중...');
+            }
             setLoading(false);
-        });
+        };
+
+        loadData();
     }, [isAuthenticated, token]);
 
     const handlePasswordSubmit = (e: React.FormEvent) => {
