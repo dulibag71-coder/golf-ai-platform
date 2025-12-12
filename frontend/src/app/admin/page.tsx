@@ -128,12 +128,12 @@ export default function AdminDashboard() {
 
     const handleApprove = async (paymentId: number) => {
         try {
-            await api.post('/admin/payments/approve', { paymentId }, token || '');
+            await api.post('/admin/payments', { paymentId });
             setPayments(payments.filter(p => p.id !== paymentId));
             setStats(prev => ({ ...prev, pendingPayments: prev.pendingPayments - 1 }));
-            alert('결제가 승인되었습니다!');
+            alert('✅ 결제가 승인되었습니다!');
         } catch (e) {
-            alert('승인 실패');
+            alert('❌ 승인 실패');
         }
     };
 
