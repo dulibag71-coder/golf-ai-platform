@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import Link from 'next/link';
 
+const ADMIN_PASSWORD = '130824';
+
 interface Payment {
     id: number;
     user_id: number;
@@ -29,6 +31,9 @@ interface Stats {
 }
 
 export default function AdminDashboard() {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [password, setPassword] = useState('');
+    const [passwordError, setPasswordError] = useState('');
     const [payments, setPayments] = useState<Payment[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [stats, setStats] = useState<Stats>({ totalUsers: 0, totalSwings: 0, pendingPayments: 0, revenue: 0 });
@@ -36,6 +41,61 @@ export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState<'overview' | 'payments' | 'users'>('overview');
 
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
+
+    // 관리자 비밀번호 인증 확인
+    useEffect(() => {
+        const adminAuth = sessionStorage.getItem('adminAuth');
+        if (adminAuth === 'true') {
+            setIsAuthenticated(true);
+        }
+    }, []);
+
+    const handlePasswordSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (password === ADMIN_PASSWORD) {
+            sessionStorage.setItem('adminAuth', 'true');
+            setIsAuthenticated(true);
+            setPasswordError('');
+        } else {
+            setPasswordError('비밀번호가 올바르지 않습니다.');
+        }
+    };
+
+    // 비밀번호 입력 화면
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+                <div className="bg-gray-900 p-8 rounded-2xl border border-gray-800 w-full max-w-md">
+                    <div className="text-center mb-8">
+                        <h1 className="text-2xl font-bold text-white mb-2">🔐 관리자 인증</h1>
+                        <p className="text-gray-400">관리자 비밀번호를 입력하세요</p>
+                    </div>
+                    <form onSubmit={handlePasswordSubmit}>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="비밀번호"
+                            className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:border-green-500"
+                            autoFocus
+                        />
+                        {passwordError && (
+                            <p className="text-red-500 text-sm mb-4">{passwordError}</p>
+                        )}
+                        <button
+                            type="submit"
+                            className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg transition"
+                        >
+                            확인
+                        </button>
+                    </form>
+                    <Link href="/" className="block text-center text-gray-400 hover:text-white mt-4">
+                        ← 홈으로 돌아가기
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
     useEffect(() => {
         if (!token) {
