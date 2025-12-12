@@ -54,12 +54,12 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (!isAuthenticated) return;
 
-        // 관리자 비밀번호로 인증되면 바로 데이터 로드 (토큰 체크 제거)
+        // 관리자 비밀번호로 인증되면 바로 데이터 로드
         const loadData = async () => {
             try {
                 const [paymentsData, usersData] = await Promise.all([
-                    token ? api.get('/admin/payments/pending', token).catch(() => []) : Promise.resolve([]),
-                    token ? api.get('/admin/users', token).catch(() => []) : Promise.resolve([])
+                    api.get('/admin/payments').catch(() => []),
+                    api.get('/admin/users').catch(() => [])
                 ]);
                 setPayments(paymentsData || []);
                 setUsers(usersData || []);
@@ -76,7 +76,7 @@ export default function AdminDashboard() {
         };
 
         loadData();
-    }, [isAuthenticated, token]);
+    }, [isAuthenticated]);
 
     const handlePasswordSubmit = (e: React.FormEvent) => {
         e.preventDefault();
