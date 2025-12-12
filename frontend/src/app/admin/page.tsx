@@ -57,17 +57,18 @@ export default function AdminDashboard() {
         // 관리자 비밀번호로 인증되면 바로 데이터 로드
         const loadData = async () => {
             try {
-                const [paymentsData, usersData] = await Promise.all([
+                const [paymentsData, usersData, statsData] = await Promise.all([
                     api.get('/admin/payments').catch(() => []),
-                    api.get('/admin/users').catch(() => [])
+                    api.get('/admin/users').catch(() => []),
+                    api.get('/admin/stats').catch(() => ({ totalUsers: 0, pendingPayments: 0, revenue: 0, totalSwings: 0 }))
                 ]);
                 setPayments(paymentsData || []);
                 setUsers(usersData || []);
                 setStats({
-                    totalUsers: usersData?.length || 0,
-                    totalSwings: 127,
-                    pendingPayments: paymentsData?.length || 0,
-                    revenue: 890000
+                    totalUsers: statsData.totalUsers || 0,
+                    totalSwings: statsData.totalSwings || 0,
+                    pendingPayments: statsData.pendingPayments || 0,
+                    revenue: statsData.revenue || 0
                 });
             } catch (error) {
                 console.log('API 연결 대기중...');
