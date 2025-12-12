@@ -60,8 +60,8 @@ export default function PricingPage() {
                         <div
                             key={idx}
                             className={`rounded-2xl p-8 ${plan.highlighted
-                                    ? 'bg-gradient-to-b from-green-900/50 to-gray-900 border-2 border-green-500 scale-105'
-                                    : 'bg-gray-900 border border-gray-800'
+                                ? 'bg-gradient-to-b from-green-900/50 to-gray-900 border-2 border-green-500 scale-105'
+                                : 'bg-gray-900 border border-gray-800'
                                 }`}
                         >
                             {plan.highlighted && (
@@ -85,10 +85,10 @@ export default function PricingPage() {
                                 ))}
                             </ul>
                             <Link
-                                href="/register"
+                                href={plan.price === '0' ? '/register' : '/payment'}
                                 className={`block w-full text-center py-3 rounded-xl font-bold transition ${plan.highlighted
-                                        ? 'bg-green-600 hover:bg-green-500 text-white'
-                                        : 'bg-gray-800 hover:bg-gray-700 text-white'
+                                    ? 'bg-green-600 hover:bg-green-500 text-white'
+                                    : 'bg-gray-800 hover:bg-gray-700 text-white'
                                     }`}
                             >
                                 {plan.cta}
