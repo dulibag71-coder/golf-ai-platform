@@ -50,6 +50,31 @@ export default function AdminDashboard() {
         }
     }, []);
 
+    // 데이터 로딩 (인증 후에만 실행)
+    useEffect(() => {
+        if (!isAuthenticated) return;
+
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+
+        Promise.all([
+            api.get('/admin/payments/pending', token).catch(() => []),
+            api.get('/admin/users', token).catch(() => [])
+        ]).then(([paymentsData, usersData]) => {
+            setPayments(paymentsData || []);
+            setUsers(usersData || []);
+            setStats({
+                totalUsers: usersData?.length || 0,
+                totalSwings: 127, // Mock
+                pendingPayments: paymentsData?.length || 0,
+                revenue: 890000 // Mock
+            });
+            setLoading(false);
+        });
+    }, [isAuthenticated, token]);
+
     const handlePasswordSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (password === ADMIN_PASSWORD) {
@@ -96,28 +121,6 @@ export default function AdminDashboard() {
             </div>
         );
     }
-
-    useEffect(() => {
-        if (!token) {
-            window.location.href = '/login';
-            return;
-        }
-
-        Promise.all([
-            api.get('/admin/payments/pending', token).catch(() => []),
-            api.get('/admin/users', token).catch(() => [])
-        ]).then(([paymentsData, usersData]) => {
-            setPayments(paymentsData || []);
-            setUsers(usersData || []);
-            setStats({
-                totalUsers: usersData?.length || 0,
-                totalSwings: 127, // Mock
-                pendingPayments: paymentsData?.length || 0,
-                revenue: 890000 // Mock
-            });
-            setLoading(false);
-        });
-    }, [token]);
 
     const handleApprove = async (paymentId: number) => {
         try {
