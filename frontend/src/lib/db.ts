@@ -31,6 +31,7 @@ export async function initializeDatabase() {
             user_id INTEGER REFERENCES users(id),
             amount INTEGER NOT NULL,
             sender_name VARCHAR(100),
+            plan_name VARCHAR(50) DEFAULT 'pro',
             status VARCHAR(20) DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )

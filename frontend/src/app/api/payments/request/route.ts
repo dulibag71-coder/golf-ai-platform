@@ -13,10 +13,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: '금액과 입금자명을 입력해주세요.' }, { status: 400 });
         }
 
+        // plan_name도 함께 저장
         const result = await sql`
-            INSERT INTO payments (user_id, amount, sender_name, status)
-            VALUES (${userId || null}, ${amount}, ${senderName}, 'pending')
-            RETURNING id, amount, sender_name, status, created_at
+            INSERT INTO payments (user_id, amount, sender_name, plan_name, status)
+            VALUES (${userId || null}, ${amount}, ${senderName}, ${planName || 'pro'}, 'pending')
+            RETURNING id, amount, sender_name, plan_name, status, created_at
         `;
 
         return NextResponse.json({
