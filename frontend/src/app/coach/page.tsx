@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
+import { api } from '@/lib/api';
 
 interface Message {
     role: 'user' | 'ai';
@@ -22,19 +23,23 @@ export default function CoachPage() {
         setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
         setLoading(true);
 
-        // Simulate AI response (in production, call GPT API)
-        setTimeout(() => {
-            const aiResponses = [
-                '좋은 질문입니다! 백스윙에서 가장 중요한 것은 어깨 회전입니다. 어깨가 90도 이상 회전해야 파워가 생깁니다.',
-                '드라이버 비거리를 늘리려면 체중 이동이 핵심입니다. 백스윙 시 오른발에 70% 체중을 실고, 다운스윙 시 왼발로 이동하세요.',
-                '슬라이스를 고치려면 그립을 확인해보세요. 왼손(오른손잡이 기준)이 너무 약하게 잡혀있을 수 있습니다.',
-                '일관된 스윙을 위해서는 템포가 중요합니다. 백스윙 3, 다운스윙 1의 리듬을 유지해보세요.',
-                '훅이 자주 나신다면 다운스윙에서 클럽헤드가 너무 빨리 닫히고 있을 수 있습니다. 릴리스 타이밍을 조절해보세요.'
-            ];
-            const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
-            setMessages(prev => [...prev, { role: 'ai', content: randomResponse }]);
+        try {
+            // 실제 AI 코치 API 호출
+            const response = await api.post('/coach/chat', {
+                message: userMessage,
+                history: messages.slice(-10) // 최근 10개 메시지만 전송
+            });
+
+            setMessages(prev => [...prev, { role: 'ai', content: response.message }]);
+        } catch (error) {
+            console.error('AI 응답 오류:', error);
+            setMessages(prev => [...prev, {
+                role: 'ai',
+                content: '죄송합니다. 잠시 후 다시 시도해주세요.'
+            }]);
+        } finally {
             setLoading(false);
-        }, 1000);
+        }
     };
 
     return (
@@ -49,8 +54,8 @@ export default function CoachPage() {
                         {messages.map((msg, idx) => (
                             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`max-w-[80%] p-4 rounded-2xl ${msg.role === 'user'
-                                        ? 'bg-green-600 text-white'
-                                        : 'bg-gray-800 text-gray-100'
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-gray-800 text-gray-100'
                                     }`}>
                                     {msg.role === 'ai' && <span className="text-xs text-green-400 block mb-1">AI 코치</span>}
                                     {msg.content}
