@@ -28,7 +28,7 @@ export async function initializeDatabase() {
     await sql`
         CREATE TABLE IF NOT EXISTS payments (
             id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id),
+            user_id INTEGER,
             amount INTEGER NOT NULL,
             sender_name VARCHAR(100),
             plan_name VARCHAR(50) DEFAULT 'pro',
@@ -37,10 +37,17 @@ export async function initializeDatabase() {
         )
     `;
 
+    // 기존 테이블에 plan_name 컬럼이 없으면 추가
+    try {
+        await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS plan_name VARCHAR(50) DEFAULT 'pro'`;
+    } catch (e) {
+        // 이미 존재하면 무시
+    }
+
     await sql`
         CREATE TABLE IF NOT EXISTS swing_analyses (
             id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id),
+            user_id INTEGER,
             video_url TEXT,
             analysis_result TEXT,
             score INTEGER,
