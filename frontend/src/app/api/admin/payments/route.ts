@@ -22,7 +22,7 @@ export async function GET() {
     }
 }
 
-// 결제 승인 - 사용자 역할 업그레이드
+// 결제 승인 - 사용자 역할 업그레이드 + 구독 만료일 설정 (1달 후)
 export async function POST(request: NextRequest) {
     try {
         const sql = getDb();
@@ -39,21 +39,27 @@ export async function POST(request: NextRequest) {
         // 2. 결제 상태를 approved로 변경
         await sql`UPDATE payments SET status = 'approved' WHERE id = ${paymentId}`;
 
-        // 3. 사용자 역할을 플랜에 맞게 업그레이드 (pro 또는 elite)
+        // 3. 구독 만료일 계산 (현재 시간 + 1달)
+        const expiresAt = new Date();
+        expiresAt.setMonth(expiresAt.getMonth() + 1);
+        const expiresAtStr = expiresAt.toISOString();
+
+        // 4. 사용자 역할 업그레이드 + 구독 만료일 설정
+        const newRole = payment.plan_name === '엘리트' ? 'elite' : 'pro';
+
         if (payment.user_id) {
-            const newRole = payment.plan_name === '엘리트' ? 'elite' : 'pro';
-            await sql`UPDATE users SET role = ${newRole} WHERE id = ${payment.user_id}`;
+            await sql`UPDATE users SET role = ${newRole}, subscription_expires_at = ${expiresAtStr} WHERE id = ${payment.user_id}`;
         }
 
-        // 4. sender_name으로 사용자 찾아서 역할 업그레이드 (user_id가 없는 경우)
+        // sender_name으로 찾기 (user_id 없을 때)
         if (!payment.user_id && payment.sender_name) {
-            const newRole = payment.plan_name === '엘리트' ? 'elite' : 'pro';
-            await sql`UPDATE users SET role = ${newRole} WHERE name = ${payment.sender_name}`;
+            await sql`UPDATE users SET role = ${newRole}, subscription_expires_at = ${expiresAtStr} WHERE name = ${payment.sender_name}`;
         }
 
         return NextResponse.json({
-            message: '결제가 승인되고 사용자 등급이 업그레이드되었습니다.',
-            plan: payment.plan_name
+            message: '결제 승인 완료! 구독이 1달간 활성화됩니다.',
+            plan: payment.plan_name,
+            expiresAt: expiresAtStr
         });
     } catch (error: any) {
         console.error('Approve payment error:', error);

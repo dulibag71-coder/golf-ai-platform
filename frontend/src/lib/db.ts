@@ -20,10 +20,16 @@ export async function initializeDatabase() {
             password VARCHAR(255) NOT NULL,
             name VARCHAR(100),
             role VARCHAR(20) DEFAULT 'user',
+            subscription_expires_at TIMESTAMP,
             is_active BOOLEAN DEFAULT true,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `;
+
+    // 기존 테이블에 subscription_expires_at 컬럼 추가
+    try {
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMP`;
+    } catch (e) { }
 
     await sql`
         CREATE TABLE IF NOT EXISTS payments (
@@ -37,12 +43,9 @@ export async function initializeDatabase() {
         )
     `;
 
-    // 기존 테이블에 plan_name 컬럼이 없으면 추가
     try {
         await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS plan_name VARCHAR(50) DEFAULT 'pro'`;
-    } catch (e) {
-        // 이미 존재하면 무시
-    }
+    } catch (e) { }
 
     await sql`
         CREATE TABLE IF NOT EXISTS swing_analyses (
