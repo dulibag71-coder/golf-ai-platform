@@ -4,81 +4,82 @@ import Navbar from '@/components/Navbar';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 
-// 대회 준비 코칭 페이지 (프로/엘리트/동호회)
+interface Tournament {
+    id: number;
+    tournament_name: string;
+    tournament_date: string;
+    program_type: string;
+    status: string;
+}
+
 export default function TournamentCoachPage() {
     const [userRole, setUserRole] = useState('user');
     const [activeProgram, setActiveProgram] = useState<string | null>(null);
+    const [tournaments, setTournaments] = useState<Tournament[]>([]);
+    const [tournamentName, setTournamentName] = useState('');
+    const [tournamentDate, setTournamentDate] = useState('');
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
         if (token) {
-            const fetchRole = async () => {
+            const fetchData = async () => {
                 try {
                     const userData = await api.get('/auth/me', token);
                     if (userData?.role) setUserRole(userData.role);
+
+                    const tournamentsData = await api.get('/tournament', token);
+                    if (tournamentsData) setTournaments(tournamentsData);
                 } catch {
                     const user = JSON.parse(localStorage.getItem('user') || '{}');
                     setUserRole(user.role || 'user');
                 }
             };
-            fetchRole();
+            fetchData();
         }
     }, []);
 
     const isPaid = userRole !== 'user';
 
     const programs = [
-        {
-            id: 'mental',
-            title: '멘탈 트레이닝',
-            icon: '🧠',
-            description: '대회 압박감 극복, 집중력 향상',
-            weeks: 4,
-            sessions: [
-                '1주차: 호흡법과 루틴 만들기',
-                '2주차: 시각화 트레이닝',
-                '3주차: 압박 상황 시뮬레이션',
-                '4주차: 실전 멘탈 적용'
-            ]
-        },
-        {
-            id: 'strategy',
-            title: '코스 전략',
-            icon: '🗺️',
-            description: '코스 공략법, 클럽 선택 전략',
-            weeks: 3,
-            sessions: [
-                '1주차: 코스 분석 방법',
-                '2주차: 상황별 클럽 선택',
-                '3주차: 리스크 관리'
-            ]
-        },
-        {
-            id: 'physical',
-            title: '피지컬 컨디셔닝',
-            icon: '💪',
-            description: '체력 관리, 부상 예방',
-            weeks: 6,
-            sessions: [
-                '1-2주차: 유연성 향상',
-                '3-4주차: 코어 강화',
-                '5-6주차: 지구력 트레이닝'
-            ]
-        },
-        {
-            id: 'scoring',
-            title: '스코어링 집중',
-            icon: '🎯',
-            description: '숏게임, 퍼팅 마스터',
-            weeks: 4,
-            sessions: [
-                '1주차: 100야드 이내 공략',
-                '2주차: 벙커/러프 탈출',
-                '3주차: 퍼팅 읽기',
-                '4주차: 클러치 퍼팅'
-            ]
-        }
+        { id: 'mental', title: '멘탈 트레이닝', icon: '🧠', description: '대회 압박감 극복, 집중력 향상', weeks: 4 },
+        { id: 'strategy', title: '코스 전략', icon: '🗺️', description: '코스 공략법, 클럽 선택 전략', weeks: 3 },
+        { id: 'physical', title: '피지컬 컨디셔닝', icon: '💪', description: '체력 관리, 부상 예방', weeks: 6 },
+        { id: 'scoring', title: '스코어링 집중', icon: '🎯', description: '숏게임, 퍼팅 마스터', weeks: 4 }
     ];
+
+    const handleRegisterTournament = async () => {
+        if (!tournamentName || !tournamentDate) {
+            alert('대회명과 날짜를 입력해주세요.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            await api.post('/tournament', {
+                tournamentName,
+                tournamentDate,
+                programType: activeProgram || 'general'
+            }, token || '');
+
+            alert('대회가 등록되었습니다!');
+            setTournamentName('');
+            setTournamentDate('');
+
+            const tournamentsData = await api.get('/tournament', token || '');
+            if (tournamentsData) setTournaments(tournamentsData);
+        } catch (error) {
+            alert('등록에 실패했습니다.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleStartProgram = async () => {
+        if (!activeProgram) return;
+        alert(`${programs.find(p => p.id === activeProgram)?.title} 프로그램이 시작됩니다! 이메일로 상세 커리큘럼이 발송됩니다.`);
+    };
 
     if (!isPaid) {
         return (
@@ -86,10 +87,10 @@ export default function TournamentCoachPage() {
                 <Navbar />
                 <div className="max-w-xl mx-auto px-4 pt-24 text-center">
                     <div className="bg-gray-900 rounded-2xl p-8 border border-gray-800">
-                        <h1 className="text-3xl font-bold mb-4">🔒 엘리트 전용 기능</h1>
-                        <p className="text-gray-400 mb-6">대회 준비 코칭은 엘리트 플랜 이상에서 이용 가능합니다.</p>
-                        <Link href="/pricing" className="inline-block bg-purple-600 hover:bg-purple-500 px-8 py-3 rounded-xl font-bold">
-                            엘리트로 업그레이드 →
+                        <h1 className="text-3xl font-bold mb-4">🔒 유료 플랜 전용</h1>
+                        <p className="text-gray-400 mb-6">대회 준비 코칭은 프로 플랜 이상에서 이용 가능합니다.</p>
+                        <Link href="/pricing" className="inline-block bg-green-600 hover:bg-green-500 px-8 py-3 rounded-xl font-bold">
+                            플랜 업그레이드 →
                         </Link>
                     </div>
                 </div>
@@ -104,16 +105,13 @@ export default function TournamentCoachPage() {
                 <h1 className="text-3xl font-bold mb-2 text-purple-400">🏆 대회 준비 코칭</h1>
                 <p className="text-gray-400 mb-8">목표 대회에 맞춘 전문 트레이닝 프로그램</p>
 
-                {/* 프로그램 목록 */}
+                {/* 프로그램 선택 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                     {programs.map(prog => (
                         <button
                             key={prog.id}
                             onClick={() => setActiveProgram(activeProgram === prog.id ? null : prog.id)}
-                            className={`p-6 rounded-2xl text-left transition ${activeProgram === prog.id
-                                ? 'bg-purple-900/30 border-2 border-purple-500'
-                                : 'bg-gray-900 border border-gray-800 hover:border-gray-600'
-                                }`}
+                            className={`p-6 rounded-2xl text-left transition ${activeProgram === prog.id ? 'bg-purple-900/30 border-2 border-purple-500' : 'bg-gray-900 border border-gray-800 hover:border-gray-600'}`}
                         >
                             <div className="flex items-center gap-3 mb-2">
                                 <span className="text-3xl">{prog.icon}</span>
@@ -125,51 +123,56 @@ export default function TournamentCoachPage() {
                     ))}
                 </div>
 
-                {/* 선택된 프로그램 상세 */}
                 {activeProgram && (
-                    <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6">
-                        {(() => {
-                            const prog = programs.find(p => p.id === activeProgram)!;
-                            return (
-                                <>
-                                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                                        <span>{prog.icon}</span> {prog.title} 커리큘럼
-                                    </h3>
-                                    <ul className="space-y-3">
-                                        {prog.sessions.map((session, idx) => (
-                                            <li key={idx} className="flex items-start gap-3 bg-gray-800 p-4 rounded-xl">
-                                                <span className="bg-purple-600 text-white text-xs px-2 py-1 rounded">{idx + 1}</span>
-                                                <span>{session}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                    <button className="w-full mt-6 bg-purple-600 hover:bg-purple-500 py-4 rounded-xl font-bold">
-                                        이 프로그램 시작하기
-                                    </button>
-                                </>
-                            );
-                        })()}
-                    </div>
+                    <button onClick={handleStartProgram} className="w-full mb-8 bg-purple-600 hover:bg-purple-500 py-4 rounded-xl font-bold">
+                        {programs.find(p => p.id === activeProgram)?.title} 프로그램 시작하기
+                    </button>
                 )}
 
-                {/* 대회 일정 등록 */}
-                <div className="mt-8 bg-gray-900 rounded-2xl border border-gray-800 p-6">
+                {/* 대회 등록 */}
+                <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 mb-8">
                     <h3 className="text-lg font-bold mb-4">📅 목표 대회 등록</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <input
                             type="text"
+                            value={tournamentName}
+                            onChange={(e) => setTournamentName(e.target.value)}
                             placeholder="대회명 (예: 2024 아마추어 선수권)"
                             className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3"
                         />
                         <input
                             type="date"
+                            value={tournamentDate}
+                            onChange={(e) => setTournamentDate(e.target.value)}
                             className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3"
                         />
                     </div>
-                    <button className="mt-4 bg-gray-700 hover:bg-gray-600 px-6 py-3 rounded-xl font-bold">
-                        대회 등록
+                    <button
+                        onClick={handleRegisterTournament}
+                        disabled={loading}
+                        className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600 px-6 py-3 rounded-xl font-bold"
+                    >
+                        {loading ? '등록 중...' : '대회 등록'}
                     </button>
                 </div>
+
+                {/* 등록된 대회 */}
+                {tournaments.length > 0 && (
+                    <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6">
+                        <h3 className="text-lg font-bold mb-4">🎯 나의 목표 대회</h3>
+                        <ul className="space-y-3">
+                            {tournaments.map(t => (
+                                <li key={t.id} className="bg-gray-800 p-4 rounded-xl flex justify-between items-center">
+                                    <div>
+                                        <p className="font-bold">{t.tournament_name}</p>
+                                        <p className="text-sm text-gray-400">{new Date(t.tournament_date).toLocaleDateString()}</p>
+                                    </div>
+                                    <span className="text-xs px-2 py-1 rounded bg-green-600">D-{Math.ceil((new Date(t.tournament_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
             </div>
         </div>
     );
