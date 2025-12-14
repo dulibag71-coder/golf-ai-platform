@@ -22,6 +22,18 @@ export async function GET() {
     }
 }
 
+// 플랜명에 따른 role 매핑
+function getPlanRole(planName: string): string {
+    const roleMap: Record<string, string> = {
+        '프로': 'pro',
+        '엘리트': 'elite',
+        '동호회 스타터': 'club_starter',
+        '동호회 프로': 'club_pro',
+        '동호회 엔터프라이즈': 'club_enterprise'
+    };
+    return roleMap[planName] || 'pro';
+}
+
 // 결제 승인 - 사용자 역할 업그레이드 + 구독 만료일 설정 (1달 후)
 export async function POST(request: NextRequest) {
     try {
@@ -44,9 +56,10 @@ export async function POST(request: NextRequest) {
         expiresAt.setMonth(expiresAt.getMonth() + 1);
         const expiresAtStr = expiresAt.toISOString();
 
-        // 4. 사용자 역할 업그레이드 + 구독 만료일 설정
-        const newRole = payment.plan_name === '엘리트' ? 'elite' : 'pro';
+        // 4. 플랜에 맞는 role 설정
+        const newRole = getPlanRole(payment.plan_name);
 
+        // 5. 사용자 역할 업그레이드 + 구독 만료일 설정
         if (payment.user_id) {
             await sql`UPDATE users SET role = ${newRole}, subscription_expires_at = ${expiresAtStr} WHERE id = ${payment.user_id}`;
         }
@@ -59,6 +72,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             message: '결제 승인 완료! 구독이 1달간 활성화됩니다.',
             plan: payment.plan_name,
+            role: newRole,
             expiresAt: expiresAtStr
         });
     } catch (error: any) {
