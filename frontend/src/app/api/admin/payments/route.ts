@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, initializeDatabase } from '@/lib/db';
 
-// 대기중인 결제 목록 조회
+// 대기중인 결제 목록 조회 (이메일 포함)
 export async function GET() {
     try {
         await initializeDatabase();
 
         const sql = getDb();
+
+        // email 컬럼 추가 (없으면)
+        try {
+            await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS email VARCHAR(255)`;
+        } catch (e) { }
+
         const payments = await sql`
-            SELECT p.*, u.email 
-            FROM payments p 
-            LEFT JOIN users u ON p.user_id = u.id 
-            WHERE p.status = 'pending'
-            ORDER BY p.created_at DESC
+            SELECT id, user_id, email, amount, sender_name, plan_name, club_name, status, created_at
+            FROM payments 
+            WHERE status = 'pending'
+            ORDER BY created_at DESC
         `;
 
         return NextResponse.json(payments);
@@ -34,7 +39,7 @@ function getPlanRole(planName: string): string {
     return roleMap[planName] || 'pro';
 }
 
-// 결제 승인 - 사용자 역할 업그레이드 + 구독 만료일 설정 (1달 후)
+// 결제 승인 - 이메일로 사용자 찾아서 역할 업그레이드
 export async function POST(request: NextRequest) {
     try {
         const sql = getDb();
@@ -59,13 +64,30 @@ export async function POST(request: NextRequest) {
         // 4. 플랜에 맞는 role 설정
         const newRole = getPlanRole(payment.plan_name);
 
-        // 5. 사용자 역할 업그레이드 + 구독 만료일 설정
-        if (payment.user_id) {
-            await sql`UPDATE users SET role = ${newRole}, subscription_expires_at = ${expiresAtStr} WHERE id = ${payment.user_id}`;
+        // 5. 이메일로 사용자 찾아서 업그레이드 (가장 확실한 방법)
+        let updated = false;
+
+        if (payment.email) {
+            const result = await sql`
+                UPDATE users 
+                SET role = ${newRole}, subscription_expires_at = ${expiresAtStr} 
+                WHERE email = ${payment.email}
+                RETURNING id, email, role
+            `;
+            if (result.length > 0) {
+                updated = true;
+                console.log('Updated by email:', result[0]);
+            }
         }
 
-        // sender_name으로 찾기 (user_id 없을 때)
-        if (!payment.user_id && payment.sender_name) {
+        // 이메일로 못 찾으면 user_id로 시도
+        if (!updated && payment.user_id) {
+            await sql`UPDATE users SET role = ${newRole}, subscription_expires_at = ${expiresAtStr} WHERE id = ${payment.user_id}`;
+            updated = true;
+        }
+
+        // 그래도 안 되면 sender_name으로 시도
+        if (!updated && payment.sender_name) {
             await sql`UPDATE users SET role = ${newRole}, subscription_expires_at = ${expiresAtStr} WHERE name = ${payment.sender_name}`;
         }
 
@@ -73,6 +95,7 @@ export async function POST(request: NextRequest) {
             message: '결제 승인 완료! 구독이 1달간 활성화됩니다.',
             plan: payment.plan_name,
             role: newRole,
+            email: payment.email,
             expiresAt: expiresAtStr
         });
     } catch (error: any) {

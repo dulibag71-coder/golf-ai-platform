@@ -273,23 +273,23 @@ export default function AdminDashboard() {
                                     <thead className="bg-gray-800">
                                         <tr>
                                             <th className="text-left p-4">ID</th>
+                                            <th className="text-left p-4">이메일</th>
                                             <th className="text-left p-4">입금자명</th>
+                                            <th className="text-left p-4">플랜</th>
                                             <th className="text-left p-4">금액</th>
-                                            <th className="text-left p-4">상태</th>
-                                            <th className="text-left p-4">일시</th>
                                             <th className="text-left p-4">작업</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {payments.map(p => (
+                                        {payments.map((p: any) => (
                                             <tr key={p.id} className="border-t border-gray-800 hover:bg-gray-800/50">
                                                 <td className="p-4">{p.id}</td>
+                                                <td className="p-4 text-blue-400">{p.email || '-'}</td>
                                                 <td className="p-4">{p.sender_name || '-'}</td>
-                                                <td className="p-4">{p.amount?.toLocaleString()}원</td>
                                                 <td className="p-4">
-                                                    <span className="bg-yellow-600 text-xs px-2 py-1 rounded">대기중</span>
+                                                    <span className="bg-green-600 text-xs px-2 py-1 rounded">{p.plan_name || 'pro'}</span>
                                                 </td>
-                                                <td className="p-4 text-gray-400">{new Date(p.created_at).toLocaleString()}</td>
+                                                <td className="p-4">{p.amount?.toLocaleString()}원</td>
                                                 <td className="p-4">
                                                     <button
                                                         onClick={() => handleApprove(p.id)}
@@ -335,14 +335,14 @@ export default function AdminDashboard() {
                                                 <td className="p-4">{u.email}</td>
                                                 <td className="p-4">
                                                     <span className={`text-xs px-2 py-1 rounded ${u.role === 'elite' ? 'bg-purple-600' :
-                                                            u.role === 'pro' ? 'bg-green-600' : 'bg-gray-600'
+                                                        u.role === 'pro' ? 'bg-green-600' : 'bg-gray-600'
                                                         }`}>
                                                         {u.role === 'elite' ? '엘리트' : u.role === 'pro' ? '프로' : '무료'}
                                                     </span>
                                                 </td>
                                                 <td className="p-4">
                                                     <span className={`text-xs px-2 py-1 rounded ${u.subscription_status === 'active' ? 'bg-green-600' :
-                                                            u.subscription_status === 'expired' ? 'bg-red-600' : 'bg-gray-600'
+                                                        u.subscription_status === 'expired' ? 'bg-red-600' : 'bg-gray-600'
                                                         }`}>
                                                         {u.subscription_status === 'active' ? '활성' :
                                                             u.subscription_status === 'expired' ? '만료' : '무료'}
