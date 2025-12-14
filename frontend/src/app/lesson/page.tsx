@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Link from 'next/link';
+import { api } from '@/lib/api';
 
-// 1:1 프로 레슨 예약 시스템 (엘리트 전용)
+// 1:1 프로 레슨 예약 시스템 (프로/엘리트/동호회)
 export default function LessonPage() {
     const [userRole, setUserRole] = useState('user');
     const [selectedDate, setSelectedDate] = useState('');
@@ -12,11 +13,23 @@ export default function LessonPage() {
     const [submitted, setSubmitted] = useState(false);
 
     useEffect(() => {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        setUserRole(user.role || 'user');
+        const token = localStorage.getItem('token');
+        if (token) {
+            const fetchRole = async () => {
+                try {
+                    const userData = await api.get('/auth/me', token);
+                    if (userData?.role) setUserRole(userData.role);
+                } catch {
+                    const user = JSON.parse(localStorage.getItem('user') || '{}');
+                    setUserRole(user.role || 'user');
+                }
+            };
+            fetchRole();
+        }
     }, []);
 
-    const isElite = userRole === 'elite' || userRole === 'club_pro' || userRole === 'club_enterprise';
+    // 프로 이상 모든 유료 플랜 접근 가능
+    const isPaid = userRole !== 'user';
 
     const timeSlots = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'];
     const lessonTypes = ['스윙 교정', '드라이버 비거리', '아이언 정확도', '숏게임', '퍼팅', '코스 전략'];
@@ -29,7 +42,7 @@ export default function LessonPage() {
         setSubmitted(true);
     };
 
-    if (!isElite) {
+    if (!isPaid) {
         return (
             <div className="min-h-screen bg-black text-white">
                 <Navbar />

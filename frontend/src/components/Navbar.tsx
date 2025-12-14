@@ -21,9 +21,9 @@ export default function Navbar() {
         window.location.href = '/login';
     };
 
-    const isElite = userRole === 'elite' || userRole === 'club_pro' || userRole === 'club_enterprise';
-    const isClub = userRole.startsWith('club');
+    // 유료 플랜 여부
     const isPaid = userRole !== 'user';
+    const isClub = userRole.startsWith('club');
 
     return (
         <nav className="fixed w-full z-50 bg-black/80 backdrop-blur-md border-b border-white/10">
@@ -40,7 +40,7 @@ export default function Navbar() {
                             <Link href="/coach" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
                                 AI 코치
                             </Link>
-                            {isElite && (
+                            {isPaid && (
                                 <>
                                     <Link href="/lesson" className="text-purple-400 hover:text-purple-300 px-3 py-2 rounded-md text-sm font-medium">
                                         1:1 레슨
@@ -66,7 +66,7 @@ export default function Navbar() {
                                 <>
                                     {isPaid && (
                                         <span className={`text-xs px-2 py-1 rounded ${userRole === 'elite' ? 'bg-purple-600' :
-                                                isClub ? 'bg-blue-600' : 'bg-green-600'
+                                            isClub ? 'bg-blue-600' : 'bg-green-600'
                                             }`}>
                                             {userRole === 'elite' ? '엘리트' :
                                                 userRole === 'club_starter' ? '동호회' :
@@ -107,8 +107,8 @@ export default function Navbar() {
                     <div className="md:hidden pb-4 space-y-2">
                         <Link href="/dashboard" className="block text-gray-300 hover:text-white px-3 py-2">분석</Link>
                         <Link href="/coach" className="block text-gray-300 hover:text-white px-3 py-2">AI 코치</Link>
-                        {isElite && <Link href="/lesson" className="block text-purple-400 px-3 py-2">1:1 레슨</Link>}
-                        {isElite && <Link href="/tournament" className="block text-purple-400 px-3 py-2">대회 코칭</Link>}
+                        {isPaid && <Link href="/lesson" className="block text-purple-400 px-3 py-2">1:1 레슨</Link>}
+                        {isPaid && <Link href="/tournament" className="block text-purple-400 px-3 py-2">대회 코칭</Link>}
                         {isClub && <Link href="/team" className="block text-blue-400 px-3 py-2">팀 대시보드</Link>}
                         <Link href="/pricing" className="block text-gray-300 hover:text-white px-3 py-2">요금제</Link>
                         {token ? (

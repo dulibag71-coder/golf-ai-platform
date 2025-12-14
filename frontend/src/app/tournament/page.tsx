@@ -2,18 +2,30 @@
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Link from 'next/link';
+import { api } from '@/lib/api';
 
-// 대회 준비 코칭 페이지 (엘리트 전용)
+// 대회 준비 코칭 페이지 (프로/엘리트/동호회)
 export default function TournamentCoachPage() {
     const [userRole, setUserRole] = useState('user');
     const [activeProgram, setActiveProgram] = useState<string | null>(null);
 
     useEffect(() => {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        setUserRole(user.role || 'user');
+        const token = localStorage.getItem('token');
+        if (token) {
+            const fetchRole = async () => {
+                try {
+                    const userData = await api.get('/auth/me', token);
+                    if (userData?.role) setUserRole(userData.role);
+                } catch {
+                    const user = JSON.parse(localStorage.getItem('user') || '{}');
+                    setUserRole(user.role || 'user');
+                }
+            };
+            fetchRole();
+        }
     }, []);
 
-    const isElite = userRole === 'elite' || userRole === 'club_pro' || userRole === 'club_enterprise';
+    const isPaid = userRole !== 'user';
 
     const programs = [
         {
@@ -68,7 +80,7 @@ export default function TournamentCoachPage() {
         }
     ];
 
-    if (!isElite) {
+    if (!isPaid) {
         return (
             <div className="min-h-screen bg-black text-white">
                 <Navbar />
@@ -99,8 +111,8 @@ export default function TournamentCoachPage() {
                             key={prog.id}
                             onClick={() => setActiveProgram(activeProgram === prog.id ? null : prog.id)}
                             className={`p-6 rounded-2xl text-left transition ${activeProgram === prog.id
-                                    ? 'bg-purple-900/30 border-2 border-purple-500'
-                                    : 'bg-gray-900 border border-gray-800 hover:border-gray-600'
+                                ? 'bg-purple-900/30 border-2 border-purple-500'
+                                : 'bg-gray-900 border border-gray-800 hover:border-gray-600'
                                 }`}
                         >
                             <div className="flex items-center gap-3 mb-2">
