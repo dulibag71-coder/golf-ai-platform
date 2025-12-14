@@ -322,25 +322,36 @@ export default function AdminDashboard() {
                                         <tr>
                                             <th className="text-left p-4">ID</th>
                                             <th className="text-left p-4">이메일</th>
-                                            <th className="text-left p-4">권한</th>
-                                            <th className="text-left p-4">상태</th>
+                                            <th className="text-left p-4">플랜</th>
+                                            <th className="text-left p-4">구독상태</th>
+                                            <th className="text-left p-4">만료일</th>
                                             <th className="text-left p-4">가입일</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {users.map(u => (
+                                        {users.map((u: any) => (
                                             <tr key={u.id} className="border-t border-gray-800 hover:bg-gray-800/50">
                                                 <td className="p-4">{u.id}</td>
                                                 <td className="p-4">{u.email}</td>
                                                 <td className="p-4">
-                                                    <span className={`text-xs px-2 py-1 rounded ${u.role === 'admin' ? 'bg-purple-600' : 'bg-gray-600'}`}>
-                                                        {u.role === 'admin' ? '관리자' : '일반회원'}
+                                                    <span className={`text-xs px-2 py-1 rounded ${u.role === 'elite' ? 'bg-purple-600' :
+                                                            u.role === 'pro' ? 'bg-green-600' : 'bg-gray-600'
+                                                        }`}>
+                                                        {u.role === 'elite' ? '엘리트' : u.role === 'pro' ? '프로' : '무료'}
                                                     </span>
                                                 </td>
                                                 <td className="p-4">
-                                                    <span className={`text-xs px-2 py-1 rounded ${u.is_active ? 'bg-green-600' : 'bg-red-600'}`}>
-                                                        {u.is_active ? '활성' : '비활성'}
+                                                    <span className={`text-xs px-2 py-1 rounded ${u.subscription_status === 'active' ? 'bg-green-600' :
+                                                            u.subscription_status === 'expired' ? 'bg-red-600' : 'bg-gray-600'
+                                                        }`}>
+                                                        {u.subscription_status === 'active' ? '활성' :
+                                                            u.subscription_status === 'expired' ? '만료' : '무료'}
                                                     </span>
+                                                </td>
+                                                <td className="p-4 text-gray-400">
+                                                    {u.subscription_expires_at
+                                                        ? new Date(u.subscription_expires_at).toLocaleDateString()
+                                                        : '-'}
                                                 </td>
                                                 <td className="p-4 text-gray-400">{new Date(u.created_at).toLocaleDateString()}</td>
                                             </tr>

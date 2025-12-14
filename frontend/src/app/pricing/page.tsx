@@ -150,9 +150,14 @@ export default function PricingPage() {
                     <p className="text-gray-300 mb-4">
                         무통장 입금 후 관리자 승인이 완료되면 서비스를 이용하실 수 있습니다.
                     </p>
-                    <div className="bg-gray-800 p-4 rounded-xl">
+                    <div className="bg-gray-800 p-4 rounded-xl mb-4">
                         <p className="font-bold text-lg">카카오뱅크 7777034553512</p>
                         <p className="text-gray-400">예금주: 박두리</p>
+                    </div>
+                    <div className="bg-blue-900/30 p-4 rounded-xl border border-blue-500">
+                        <p className="font-bold text-blue-400">📞 문의</p>
+                        <p className="text-xl font-bold mt-1">010-8632-3819</p>
+                        <p className="text-gray-400 text-sm mt-1">동호회/단체 문의 환영</p>
                     </div>
                 </div>
             </div>
