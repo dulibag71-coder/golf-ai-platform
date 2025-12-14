@@ -12,13 +12,25 @@ interface Tournament {
     status: string;
 }
 
+interface TrainingProgress {
+    id: number;
+    program_id: string;
+    program_name: string;
+    week_number: number;
+    total_weeks: number;
+    tasks_completed: number;
+    total_tasks: number;
+}
+
 export default function TournamentCoachPage() {
     const [userRole, setUserRole] = useState('user');
     const [activeProgram, setActiveProgram] = useState<string | null>(null);
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
+    const [trainingProgress, setTrainingProgress] = useState<TrainingProgress[]>([]);
     const [tournamentName, setTournamentName] = useState('');
     const [tournamentDate, setTournamentDate] = useState('');
     const [loading, setLoading] = useState(false);
+    const [startingProgram, setStartingProgram] = useState(false);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -30,6 +42,9 @@ export default function TournamentCoachPage() {
 
                     const tournamentsData = await api.get('/tournament', token);
                     if (tournamentsData) setTournaments(tournamentsData);
+
+                    const trainingData = await api.get('/training', token);
+                    if (trainingData) setTrainingProgress(trainingData);
                 } catch {
                     const user = JSON.parse(localStorage.getItem('user') || '{}');
                     setUserRole(user.role || 'user');
@@ -78,7 +93,44 @@ export default function TournamentCoachPage() {
 
     const handleStartProgram = async () => {
         if (!activeProgram) return;
-        alert(`${programs.find(p => p.id === activeProgram)?.title} 프로그램이 시작됩니다! 이메일로 상세 커리큘럼이 발송됩니다.`);
+
+        const program = programs.find(p => p.id === activeProgram);
+        if (!program) return;
+
+        setStartingProgram(true);
+        try {
+            const token = localStorage.getItem('token');
+            const result = await api.post('/training', {
+                programId: program.id,
+                programName: program.title,
+                weeks: program.weeks
+            }, token || '');
+
+            alert(result.message || '프로그램이 시작되었습니다! 이메일로 커리큘럼이 발송됩니다.');
+
+            const trainingData = await api.get('/training', token || '');
+            if (trainingData) setTrainingProgress(trainingData);
+        } catch (error) {
+            alert('프로그램 시작에 실패했습니다.');
+        } finally {
+            setStartingProgram(false);
+        }
+    };
+
+    const updateProgress = async (progressId: number, newTasksCompleted: number, weekNumber: number) => {
+        try {
+            const token = localStorage.getItem('token');
+            await api.put('/training', {
+                progressId,
+                tasksCompleted: newTasksCompleted,
+                weekNumber
+            }, token || '');
+
+            const trainingData = await api.get('/training', token || '');
+            if (trainingData) setTrainingProgress(trainingData);
+        } catch (error) {
+            console.error('Progress update failed');
+        }
     };
 
     if (!isPaid) {
@@ -105,27 +157,71 @@ export default function TournamentCoachPage() {
                 <h1 className="text-3xl font-bold mb-2 text-purple-400">🏆 대회 준비 코칭</h1>
                 <p className="text-gray-400 mb-8">목표 대회에 맞춘 전문 트레이닝 프로그램</p>
 
+                {/* 진행 중인 훈련 */}
+                {trainingProgress.length > 0 && (
+                    <div className="bg-purple-900/20 border border-purple-500 rounded-2xl p-6 mb-8">
+                        <h3 className="text-lg font-bold mb-4">📊 진행 중인 훈련</h3>
+                        <div className="space-y-4">
+                            {trainingProgress.map(tp => (
+                                <div key={tp.id} className="bg-gray-800 p-4 rounded-xl">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="font-bold">{tp.program_name}</span>
+                                        <span className="text-sm text-gray-400">{tp.week_number}/{tp.total_weeks}주차</span>
+                                    </div>
+                                    <div className="w-full bg-gray-700 rounded-full h-3 mb-2">
+                                        <div
+                                            className="bg-purple-600 h-3 rounded-full transition-all"
+                                            style={{ width: `${(tp.tasks_completed / tp.total_tasks) * 100}%` }}
+                                        />
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-gray-400">완료: {tp.tasks_completed}/{tp.total_tasks}</span>
+                                        <button
+                                            onClick={() => updateProgress(tp.id, tp.tasks_completed + 1, tp.week_number)}
+                                            className="text-sm bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded"
+                                        >
+                                            +1 완료
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* 프로그램 선택 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                    {programs.map(prog => (
-                        <button
-                            key={prog.id}
-                            onClick={() => setActiveProgram(activeProgram === prog.id ? null : prog.id)}
-                            className={`p-6 rounded-2xl text-left transition ${activeProgram === prog.id ? 'bg-purple-900/30 border-2 border-purple-500' : 'bg-gray-900 border border-gray-800 hover:border-gray-600'}`}
-                        >
-                            <div className="flex items-center gap-3 mb-2">
-                                <span className="text-3xl">{prog.icon}</span>
-                                <h3 className="text-xl font-bold">{prog.title}</h3>
-                            </div>
-                            <p className="text-gray-400 text-sm">{prog.description}</p>
-                            <p className="text-purple-400 text-sm mt-2">{prog.weeks}주 프로그램</p>
-                        </button>
-                    ))}
+                    {programs.map(prog => {
+                        const isActive = trainingProgress.some(tp => tp.program_id === prog.id);
+                        return (
+                            <button
+                                key={prog.id}
+                                onClick={() => setActiveProgram(activeProgram === prog.id ? null : prog.id)}
+                                disabled={isActive}
+                                className={`p-6 rounded-2xl text-left transition ${isActive ? 'bg-green-900/30 border border-green-500' :
+                                        activeProgram === prog.id ? 'bg-purple-900/30 border-2 border-purple-500' :
+                                            'bg-gray-900 border border-gray-800 hover:border-gray-600'
+                                    } ${isActive ? 'opacity-70' : ''}`}
+                            >
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className="text-3xl">{prog.icon}</span>
+                                    <h3 className="text-xl font-bold">{prog.title}</h3>
+                                    {isActive && <span className="text-xs bg-green-600 px-2 py-1 rounded">진행 중</span>}
+                                </div>
+                                <p className="text-gray-400 text-sm">{prog.description}</p>
+                                <p className="text-purple-400 text-sm mt-2">{prog.weeks}주 프로그램</p>
+                            </button>
+                        );
+                    })}
                 </div>
 
-                {activeProgram && (
-                    <button onClick={handleStartProgram} className="w-full mb-8 bg-purple-600 hover:bg-purple-500 py-4 rounded-xl font-bold">
-                        {programs.find(p => p.id === activeProgram)?.title} 프로그램 시작하기
+                {activeProgram && !trainingProgress.some(tp => tp.program_id === activeProgram) && (
+                    <button
+                        onClick={handleStartProgram}
+                        disabled={startingProgram}
+                        className="w-full mb-8 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 py-4 rounded-xl font-bold"
+                    >
+                        {startingProgram ? '시작 중...' : `${programs.find(p => p.id === activeProgram)?.title} 프로그램 시작하기`}
                     </button>
                 )}
 
@@ -161,15 +257,20 @@ export default function TournamentCoachPage() {
                     <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6">
                         <h3 className="text-lg font-bold mb-4">🎯 나의 목표 대회</h3>
                         <ul className="space-y-3">
-                            {tournaments.map(t => (
-                                <li key={t.id} className="bg-gray-800 p-4 rounded-xl flex justify-between items-center">
-                                    <div>
-                                        <p className="font-bold">{t.tournament_name}</p>
-                                        <p className="text-sm text-gray-400">{new Date(t.tournament_date).toLocaleDateString()}</p>
-                                    </div>
-                                    <span className="text-xs px-2 py-1 rounded bg-green-600">D-{Math.ceil((new Date(t.tournament_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))}</span>
-                                </li>
-                            ))}
+                            {tournaments.map(t => {
+                                const dDay = Math.ceil((new Date(t.tournament_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                                return (
+                                    <li key={t.id} className="bg-gray-800 p-4 rounded-xl flex justify-between items-center">
+                                        <div>
+                                            <p className="font-bold">{t.tournament_name}</p>
+                                            <p className="text-sm text-gray-400">{new Date(t.tournament_date).toLocaleDateString()}</p>
+                                        </div>
+                                        <span className={`text-xs px-2 py-1 rounded ${dDay > 0 ? 'bg-green-600' : 'bg-red-600'}`}>
+                                            {dDay > 0 ? `D-${dDay}` : '종료'}
+                                        </span>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     </div>
                 )}

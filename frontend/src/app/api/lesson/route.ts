@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, initializeDatabase } from '@/lib/db';
 import jwt from 'jsonwebtoken';
+import { sendEmail, getLessonConfirmationEmail } from '@/lib/email';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'golf-ai-platform-secret-2024';
 
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// 레슨 예약 생성
+// 레슨 예약 생성 + 이메일 발송
 export async function POST(request: NextRequest) {
     try {
         await initializeDatabase();
@@ -54,8 +55,18 @@ export async function POST(request: NextRequest) {
             RETURNING *
         `;
 
+        // 이메일 발송
+        if (decoded.email) {
+            const emailHtml = getLessonConfirmationEmail(
+                lessonType,
+                new Date(lessonDate).toLocaleDateString('ko-KR'),
+                lessonTime
+            );
+            await sendEmail(decoded.email, `[Golfing AI] 레슨 예약 확인 - ${lessonType}`, emailHtml);
+        }
+
         return NextResponse.json({
-            message: '레슨 예약이 완료되었습니다!',
+            message: '레슨 예약이 완료되었습니다! 확인 이메일이 발송되었습니다.',
             booking: result[0]
         });
     } catch (error: any) {
