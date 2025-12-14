@@ -109,7 +109,7 @@ export default function PricingPage() {
                             )}
                             <h2 className="text-2xl font-bold mt-4">{plan.name}</h2>
                             {'members' in plan && (
-                                <p className="text-blue-400 text-sm mt-1">{plan.members}</p>
+                                <p className="text-blue-400 text-sm mt-1">{(plan as any).members}</p>
                             )}
                             <div className="mt-4 mb-6">
                                 {plan.price === '문의' ? (
