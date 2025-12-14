@@ -25,13 +25,31 @@ export default function Dashboard() {
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const t = localStorage.getItem('token');
-            if (!t) window.location.href = '/login';
-            else {
-                setToken(t);
-                // 사용자 정보에서 role 가져오기
-                const user = JSON.parse(localStorage.getItem('user') || '{}');
-                setUserRole(user.role || 'user');
+            if (!t) {
+                window.location.href = '/login';
+                return;
             }
+            setToken(t);
+
+            // 서버에서 최신 사용자 정보 가져오기
+            const fetchUserInfo = async () => {
+                try {
+                    const userData = await api.get('/auth/me', t);
+                    if (userData && userData.role) {
+                        setUserRole(userData.role);
+                        // localStorage도 업데이트
+                        const user = JSON.parse(localStorage.getItem('user') || '{}');
+                        user.role = userData.role;
+                        user.subscription_expires_at = userData.subscription_expires_at;
+                        localStorage.setItem('user', JSON.stringify(user));
+                    }
+                } catch (e) {
+                    // API 실패시 localStorage 사용
+                    const user = JSON.parse(localStorage.getItem('user') || '{}');
+                    setUserRole(user.role || 'user');
+                }
+            };
+            fetchUserInfo();
         }
     }, []);
 
@@ -82,8 +100,8 @@ export default function Dashboard() {
                     <div className="flex justify-between items-center">
                         <div>
                             <span className={`text-xs px-2 py-1 rounded ${userRole === 'elite' ? 'bg-purple-600' :
-                                    userRole.startsWith('club') ? 'bg-blue-600' :
-                                        userRole === 'pro' ? 'bg-green-600' : 'bg-gray-600'
+                                userRole.startsWith('club') ? 'bg-blue-600' :
+                                    userRole === 'pro' ? 'bg-green-600' : 'bg-gray-600'
                                 }`}>
                                 {userRole === 'elite' ? '엘리트' :
                                     userRole === 'club_starter' ? '동호회 스타터' :
@@ -117,7 +135,7 @@ export default function Dashboard() {
                             onClick={handleUpload}
                             disabled={!file || analyzing || !canAnalyze}
                             className={`mt-6 w-full py-3 rounded-xl font-bold transition ${!canAnalyze ? 'bg-gray-600 cursor-not-allowed' :
-                                    analyzing ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500'
+                                analyzing ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500'
                                 }`}
                         >
                             {!canAnalyze ? '플랜 업그레이드 필요' : analyzing ? 'AI 분석 중...' : '스윙 분석 시작'}
