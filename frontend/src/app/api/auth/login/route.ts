@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             message: '로그인 성공!',
-            user: { id: user.id, email: user.email, name: user.name, role: user.role },
+            user: { id: user.id, email: user.email, name: user.name, role: user.role, subscription_expires_at: user.subscription_expires_at },
             token
         });
     } catch (error: any) {
