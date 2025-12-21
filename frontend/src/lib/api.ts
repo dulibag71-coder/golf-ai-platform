@@ -1,4 +1,4 @@
-const API_URL = '/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 export const api = {
     async get(endpoint: string, token?: string) {
@@ -6,7 +6,10 @@ export const api = {
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
         const res = await fetch(`${API_URL}${endpoint}`, { headers });
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || `HTTP error! status: ${res.status}`);
+        }
         return res.json();
     },
 
@@ -20,7 +23,10 @@ export const api = {
             headers,
             body: isFormData ? body : JSON.stringify(body),
         });
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || `HTTP error! status: ${res.status}`);
+        }
         return res.json();
     },
 
@@ -33,7 +39,10 @@ export const api = {
             headers,
             body: JSON.stringify(body),
         });
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || `HTTP error! status: ${res.status}`);
+        }
         return res.json();
     }
 };

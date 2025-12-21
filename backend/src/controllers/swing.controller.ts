@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { uploadToS3 } from '../services/s3.service';
 import { pool } from '../config/database';
-import { ResultSetHeader } from 'mysql2';
 import { analyzeSwing } from '../services/analysis.service';
 
 export const uploadSwing = async (req: Request, res: Response) => {
@@ -14,14 +13,14 @@ export const uploadSwing = async (req: Request, res: Response) => {
         const videoUrl = await uploadToS3(req.file);
 
         // Save to DB
-        const [result] = await pool.execute<ResultSetHeader>(
-            'INSERT INTO swing_videos (user_id, video_url, upload_status) VALUES (?, ?, ?)',
+        const result = await pool.query(
+            'INSERT INTO swing_videos (user_id, video_url, upload_status) VALUES ($1, $2, $3) RETURNING id',
             [userId, videoUrl, 'completed']
         );
 
         res.status(201).json({
             message: '스윙 영상이 성공적으로 업로드되었습니다.',
-            videoId: result.insertId,
+            videoId: result.rows[0].id,
             videoUrl
         });
 
@@ -39,10 +38,10 @@ export const requestAnalysis = async (req: Request, res: Response) => {
         const analysisResult = await analyzeSwing(keypoints);
 
         // Save Analysis
-        const [result] = await pool.execute<ResultSetHeader>(
+        await pool.query(
             `INSERT INTO swing_analyses 
             (video_id, score_total, score_stability, score_path, score_impact, score_weight_transfer, score_release, score_consistency, diagnosis_problems, diagnosis_good_point, injury_risk_warning, keypoints_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
             [
                 videoId,
                 analysisResult.score_total,

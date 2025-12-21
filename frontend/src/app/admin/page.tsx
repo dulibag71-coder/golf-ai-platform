@@ -2,6 +2,12 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import Link from 'next/link';
+import Navbar from '@/components/Navbar';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Shield, Users, CreditCard, Activity, Terminal, ChevronRight, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import BentoCard from '@/components/ui/BentoCard';
+import AnimatedButton from '@/components/ui/AnimatedButton';
+import { cn } from '@/lib/utils';
 
 const ADMIN_PASSWORD = '130824';
 
@@ -11,6 +17,7 @@ interface Payment {
     email?: string;
     amount: number;
     sender_name: string;
+    plan_name?: string;
     status: string;
     created_at: string;
 }
@@ -21,6 +28,8 @@ interface User {
     role: string;
     is_active: boolean;
     created_at: string;
+    subscription_status?: string;
+    subscription_expires_at?: string;
 }
 
 interface Stats {
@@ -40,13 +49,13 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'overview' | 'payments' | 'users'>('overview');
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
-
     // 관리자 비밀번호 인증 확인
     useEffect(() => {
-        const adminAuth = sessionStorage.getItem('adminAuth');
-        if (adminAuth === 'true') {
-            setIsAuthenticated(true);
+        if (typeof window !== 'undefined') {
+            const adminAuth = sessionStorage.getItem('adminAuth');
+            if (adminAuth === 'true') {
+                setIsAuthenticated(true);
+            }
         }
     }, []);
 
@@ -54,14 +63,17 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (!isAuthenticated) return;
 
-        // 관리자 비밀번호로 인증되면 바로 데이터 로드
         const loadData = async () => {
             try {
+                const token = localStorage.getItem('token');
+                if (!token) return;
+
                 const [paymentsData, usersData, statsData] = await Promise.all([
-                    api.get('/admin/payments').catch(() => []),
-                    api.get('/admin/users').catch(() => []),
-                    api.get('/admin/stats').catch(() => ({ totalUsers: 0, pendingPayments: 0, revenue: 0, totalSwings: 0 }))
+                    api.get('/admin/payments/pending', token).catch(() => []),
+                    api.get('/admin/users', token).catch(() => []),
+                    api.get('/admin/stats', token).catch(() => ({ totalUsers: 0, pendingPayments: 0, revenue: 0, totalSwings: 0 }))
                 ]);
+
                 setPayments(paymentsData || []);
                 setUsers(usersData || []);
                 setStats({
@@ -71,9 +83,10 @@ export default function AdminDashboard() {
                     revenue: statsData.revenue || 0
                 });
             } catch (error) {
-                console.log('API 연결 대기중...');
+                console.error('Data load error:', error);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         loadData();
@@ -86,299 +99,319 @@ export default function AdminDashboard() {
             setIsAuthenticated(true);
             setPasswordError('');
         } else {
-            setPasswordError('비밀번호가 올바르지 않습니다.');
+            setPasswordError('인가되지 않은 접근 코드입니다.');
         }
     };
-
-    // 비밀번호 입력 화면
-    if (!isAuthenticated) {
-        return (
-            <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-                <div className="bg-gray-900 p-8 rounded-2xl border border-gray-800 w-full max-w-md">
-                    <div className="text-center mb-8">
-                        <h1 className="text-2xl font-bold text-white mb-2">🔐 관리자 인증</h1>
-                        <p className="text-gray-400">관리자 비밀번호를 입력하세요</p>
-                    </div>
-                    <form onSubmit={handlePasswordSubmit}>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="비밀번호"
-                            className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:border-green-500"
-                            autoFocus
-                        />
-                        {passwordError && (
-                            <p className="text-red-500 text-sm mb-4">{passwordError}</p>
-                        )}
-                        <button
-                            type="submit"
-                            className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg transition"
-                        >
-                            확인
-                        </button>
-                    </form>
-                    <Link href="/" className="block text-center text-gray-400 hover:text-white mt-4">
-                        ← 홈으로 돌아가기
-                    </Link>
-                </div>
-            </div>
-        );
-    }
 
     const handleApprove = async (paymentId: number) => {
         try {
-            await api.post('/admin/payments', { paymentId });
+            const token = localStorage.getItem('token');
+            await api.post('/admin/payments/approve', { paymentId }, token || '');
             setPayments(payments.filter(p => p.id !== paymentId));
             setStats(prev => ({ ...prev, pendingPayments: prev.pendingPayments - 1 }));
-            alert('✅ 결제가 승인되었습니다!');
+            // Success notification logic could go here
         } catch (e) {
-            alert('❌ 승인 실패');
+            console.error('Approval failed:', e);
         }
     };
 
-    if (loading) {
+    if (!isAuthenticated) {
         return (
-            <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-                <div className="text-white text-xl">관리자 패널 로딩 중...</div>
+            <div className="min-h-screen bg-black flex items-center justify-center font-sans selection:bg-accent/30 p-6">
+                <div className="w-full max-w-md">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white/5 border border-white/10 p-8 rounded-3xl backdrop-blur-xl relative overflow-hidden group"
+                    >
+                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <Shield size={120} />
+                        </div>
+
+                        <div className="text-center mb-10 relative z-10">
+                            <div className="inline-block px-3 py-1 rounded-full border border-accent/20 bg-accent/5 text-accent font-mono text-[10px] tracking-[0.3em] uppercase mb-4">
+                                Secure Authorization
+                            </div>
+                            <h1 className="font-display text-3xl font-black tracking-tighter tech-glow mb-2 uppercase italic">ADMIN <span className="text-accent">TERMINAL</span></h1>
+                            <p className="text-muted text-[10px] font-mono uppercase tracking-widest opacity-60">Master Command Uplink Required</p>
+                        </div>
+
+                        <form onSubmit={handlePasswordSubmit} className="space-y-6 relative z-10">
+                            <div className="space-y-2">
+                                <label className="font-mono text-[10px] uppercase tracking-widest text-muted">Access Key</label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="KEY_CODE"
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 focus:outline-none focus:border-accent font-mono text-sm tracking-[0.5em] text-center"
+                                    autoFocus
+                                />
+                                {passwordError && (
+                                    <p className="text-red-500 font-mono text-[10px] uppercase mt-2">Error: {passwordError}</p>
+                                )}
+                            </div>
+
+                            <AnimatedButton type="submit" variant="primary" className="w-full py-4 font-black tracking-[0.2em] text-xs">
+                                INITIALIZE UPLINK
+                            </AnimatedButton>
+                        </form>
+
+                        <Link href="/" className="block text-center text-muted hover:text-white mt-8 font-mono text-[10px] uppercase tracking-widest transition-colors">
+                            ← Return to Grid
+                        </Link>
+                    </motion.div>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-950 text-white">
-            {/* Admin Navbar */}
-            <nav className="bg-gray-900 border-b border-gray-800 px-6 py-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                        <Link href="/" className="text-2xl font-bold text-green-400">Golfing</Link>
-                        <span className="text-gray-400">|</span>
-                        <span className="text-gray-300 font-medium">관리자 대시보드</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <span className="text-sm text-gray-400">박두리 (CEO)</span>
-                        <button
-                            onClick={() => { localStorage.clear(); window.location.href = '/login'; }}
-                            className="text-sm text-gray-400 hover:text-white"
-                        >
-                            로그아웃
-                        </button>
-                    </div>
-                </div>
-            </nav>
+        <div className="min-h-screen bg-black text-white font-sans selection:bg-accent/30 overflow-x-hidden">
+            <Navbar />
 
-            <div className="flex">
-                {/* Sidebar */}
-                <aside className="w-64 min-h-screen bg-gray-900 border-r border-gray-800 p-4">
-                    <nav className="space-y-2">
-                        <button
-                            onClick={() => setActiveTab('overview')}
-                            className={`w-full text-left px-4 py-3 rounded-lg transition ${activeTab === 'overview' ? 'bg-green-600 text-white' : 'text-gray-400 hover:bg-gray-800'}`}
+            <main className="max-w-7xl mx-auto px-6 pt-32 pb-16">
+                <header className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8">
+                    <div>
+                        <motion.div
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="inline-block px-3 py-1 rounded-full border border-green-500/20 bg-green-500/5 text-green-400 font-mono text-[10px] tracking-[0.3em] uppercase mb-4"
                         >
-                            📊 대시보드
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('payments')}
-                            className={`w-full text-left px-4 py-3 rounded-lg transition ${activeTab === 'payments' ? 'bg-green-600 text-white' : 'text-gray-400 hover:bg-gray-800'}`}
-                        >
-                            💳 결제 관리
-                            {stats.pendingPayments > 0 && (
-                                <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                                    {stats.pendingPayments}
-                                </span>
-                            )}
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('users')}
-                            className={`w-full text-left px-4 py-3 rounded-lg transition ${activeTab === 'users' ? 'bg-green-600 text-white' : 'text-gray-400 hover:bg-gray-800'}`}
-                        >
-                            👥 회원 관리
-                        </button>
-                    </nav>
-
-                    {/* Bank Info */}
-                    <div className="mt-8 p-4 bg-gray-800 rounded-lg">
-                        <h4 className="text-sm font-bold text-green-400 mb-2">입금 계좌</h4>
-                        <p className="text-sm text-white">카카오뱅크</p>
-                        <p className="text-sm text-gray-300">7777034553512</p>
-                        <p className="text-xs text-gray-400 mt-1">예금주: 박두리</p>
+                            System Administrator Access
+                        </motion.div>
+                        <h1 className="font-display text-5xl font-black tracking-tighter tech-glow italic uppercase">COMMAND <span className="text-accent">DASHBOARD</span></h1>
                     </div>
-                </aside>
 
-                {/* Main Content */}
-                <main className="flex-1 p-8">
+                    <div className="flex gap-2 bg-white/5 p-1 rounded-2xl border border-white/10">
+                        {(['overview', 'payments', 'users'] as const).map((tab) => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={cn(
+                                    "px-6 py-2.5 rounded-xl font-bold text-[10px] tracking-widest uppercase transition-all",
+                                    activeTab === tab ? "bg-accent text-black shadow-[0_0_20px_rgba(0,242,255,0.3)]" : "text-muted hover:text-white"
+                                )}
+                            >
+                                {tab === 'overview' ? '개요' : tab === 'payments' ? '결제 관리' : '유저 관리'}
+                                {tab === 'payments' && stats.pendingPayments > 0 && (
+                                    <span className="ml-2 px-1.5 py-0.5 bg-red-500 text-white rounded-full text-[8px]">{stats.pendingPayments}</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </header>
+
+                <AnimatePresence mode="wait">
                     {activeTab === 'overview' && (
-                        <div>
-                            <h1 className="text-2xl font-bold mb-8">대시보드 개요</h1>
-
-                            {/* Stats Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                                <StatCard title="총 회원수" value={stats.totalUsers} suffix="명" color="blue" />
-                                <StatCard title="총 스윙 분석" value={stats.totalSwings} suffix="회" color="green" />
-                                <StatCard title="대기 결제" value={stats.pendingPayments} suffix="건" color="yellow" />
-                                <StatCard title="이번 달 매출" value={stats.revenue.toLocaleString()} suffix="원" color="purple" />
+                        <motion.div
+                            key="overview"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                        >
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+                                <BentoCard icon={<Users className="text-blue-400" />} title="유저 현황" subtitle="전체 등록 개체">
+                                    <div className="mt-4">
+                                        <span className="text-4xl font-display font-black italic tracking-tighter">{stats.totalUsers}</span>
+                                        <span className="text-[10px] text-muted font-mono ml-2 uppercase tracking-widest">Entities</span>
+                                    </div>
+                                </BentoCard>
+                                <BentoCard icon={<Activity className="text-green-400" />} title="분석 활동" subtitle="총 로깅 데이터">
+                                    <div className="mt-4">
+                                        <span className="text-4xl font-display font-black italic tracking-tighter text-green-400 tech-glow">{stats.totalSwings}</span>
+                                        <span className="text-[10px] text-muted font-mono ml-2 uppercase tracking-widest">Ops</span>
+                                    </div>
+                                </BentoCard>
+                                <BentoCard icon={<CreditCard className="text-yellow-400" />} title="대기 트랜잭션" subtitle="검증 필요 항목">
+                                    <div className="mt-4">
+                                        <span className="text-4xl font-display font-black italic tracking-tighter text-yellow-400">{stats.pendingPayments}</span>
+                                        <span className="text-[10px] text-muted font-mono ml-2 uppercase tracking-widest">Pending</span>
+                                    </div>
+                                </BentoCard>
+                                <BentoCard icon={<Terminal className="text-purple-400" />} title="월간 프로토콜 수익" subtitle="누적 결제 할당량">
+                                    <div className="mt-4">
+                                        <span className="text-3xl font-display font-black italic tracking-tighter text-purple-400 tech-glow">₩{stats.revenue.toLocaleString()}</span>
+                                    </div>
+                                </BentoCard>
                             </div>
 
-                            {/* Recent Activity */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-                                    <h2 className="text-lg font-bold mb-4">최근 결제 대기</h2>
-                                    {payments.length === 0 ? (
-                                        <p className="text-gray-500">대기 중인 결제가 없습니다</p>
-                                    ) : (
-                                        <ul className="space-y-3">
-                                            {payments.slice(0, 5).map(p => (
-                                                <li key={p.id} className="flex justify-between items-center bg-gray-800 p-3 rounded-lg">
-                                                    <div>
-                                                        <p className="font-medium">{p.sender_name || '알 수 없음'}</p>
-                                                        <p className="text-sm text-gray-400">{p.amount?.toLocaleString()}원</p>
+                                <div className="bg-white/5 border border-white/10 rounded-3xl p-8 relative overflow-hidden group">
+                                    <div className="flex items-center justify-between mb-8">
+                                        <h2 className="font-display text-xl font-black italic tracking-tighter uppercase">RECENT <span className="text-accent">TRANSFERS</span></h2>
+                                        <Link href="#" onClick={() => setActiveTab('payments')} className="text-[10px] font-mono text-muted hover:text-accent tracking-widest transition-colors uppercase">View All →</Link>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {payments.slice(0, 5).map(p => (
+                                            <div key={p.id} className="flex items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl group/item hover:border-accent/30 transition-all">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="h-10 w-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                                                        <Clock size={18} />
                                                     </div>
-                                                    <button
-                                                        onClick={() => handleApprove(p.id)}
-                                                        className="bg-green-600 hover:bg-green-500 px-3 py-1 rounded text-sm"
-                                                    >
-                                                        승인
-                                                    </button>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
+                                                    <div>
+                                                        <p className="font-display font-black text-sm tracking-tighter uppercase italic">{p.sender_name}</p>
+                                                        <p className="text-[10px] text-muted font-mono uppercase tracking-widest">₩{p.amount.toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleApprove(p.id)}
+                                                    className="px-4 py-2 bg-accent text-black rounded-xl text-[9px] font-black tracking-widest uppercase hover:scale-105 transition-transform"
+                                                >
+                                                    Approve
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {payments.length === 0 && <p className="text-center py-12 text-muted font-mono text-[10px] uppercase tracking-widest">No Pending Operations</p>}
+                                    </div>
                                 </div>
 
-                                <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-                                    <h2 className="text-lg font-bold mb-4">최근 가입 회원</h2>
-                                    <ul className="space-y-3">
+                                <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
+                                    <div className="flex items-center justify-between mb-8">
+                                        <h2 className="font-display text-xl font-black italic tracking-tighter uppercase">NEWLY <span className="text-blue-400">INITIALIZED</span></h2>
+                                        <Link href="#" onClick={() => setActiveTab('users')} className="text-[10px] font-mono text-muted hover:text-blue-400 tracking-widest transition-colors uppercase">View All →</Link>
+                                    </div>
+                                    <div className="space-y-4">
                                         {users.slice(0, 5).map(u => (
-                                            <li key={u.id} className="flex justify-between items-center bg-gray-800 p-3 rounded-lg">
-                                                <div>
-                                                    <p className="font-medium">{u.email}</p>
-                                                    <p className="text-sm text-gray-400">{new Date(u.created_at).toLocaleDateString()}</p>
+                                            <div key={u.id} className="flex items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="h-10 w-10 rounded-xl bg-blue-400/10 flex items-center justify-center text-blue-400">
+                                                        <Users size={18} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-mono text-xs text-white break-all max-w-[150px] md:max-w-none">{u.email}</p>
+                                                        <p className="text-[10px] text-muted font-mono uppercase tracking-widest">{new Date(u.created_at).toLocaleDateString()}</p>
+                                                    </div>
                                                 </div>
-                                                <span className={`text-xs px-2 py-1 rounded ${u.role === 'admin' ? 'bg-purple-600' : 'bg-gray-600'}`}>
+                                                <span className={cn(
+                                                    "px-2 py-1 rounded-md text-[8px] font-black tracking-widest uppercase",
+                                                    u.role === 'admin' ? "bg-purple-500/20 text-purple-400" : "bg-white/10 text-muted"
+                                                )}>
                                                     {u.role}
                                                 </span>
-                                            </li>
+                                            </div>
                                         ))}
-                                    </ul>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        </motion.div>
                     )}
 
                     {activeTab === 'payments' && (
-                        <div>
-                            <h1 className="text-2xl font-bold mb-8">결제 관리</h1>
-                            <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-                                <table className="w-full">
-                                    <thead className="bg-gray-800">
+                        <motion.div
+                            key="payments"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden"
+                        >
+                            <div className="p-8 border-b border-white/10">
+                                <h1 className="font-display text-2xl font-black italic tracking-tighter uppercase">PENDING <span className="text-accent">SETTLEMENTS</span></h1>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left font-mono text-[10px]">
+                                    <thead className="bg-white/5 border-b border-white/10 uppercase tracking-widest text-muted">
                                         <tr>
-                                            <th className="text-left p-4">ID</th>
-                                            <th className="text-left p-4">이메일</th>
-                                            <th className="text-left p-4">입금자명</th>
-                                            <th className="text-left p-4">플랜</th>
-                                            <th className="text-left p-4">금액</th>
-                                            <th className="text-left p-4">작업</th>
+                                            <th className="p-6">Entity_ID</th>
+                                            <th className="p-6">Sender_Ident</th>
+                                            <th className="p-6">Target_Plan</th>
+                                            <th className="p-6">Quota_Amount</th>
+                                            <th className="p-6">Status</th>
+                                            <th className="p-6">Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {payments.map((p: any) => (
-                                            <tr key={p.id} className="border-t border-gray-800 hover:bg-gray-800/50">
-                                                <td className="p-4">{p.id}</td>
-                                                <td className="p-4 text-blue-400">{p.email || '-'}</td>
-                                                <td className="p-4">{p.sender_name || '-'}</td>
-                                                <td className="p-4">
-                                                    <span className="bg-green-600 text-xs px-2 py-1 rounded">{p.plan_name || 'pro'}</span>
+                                    <tbody className="divide-y divide-white/5">
+                                        {payments.map((p) => (
+                                            <tr key={p.id} className="hover:bg-white/5 transition-colors group">
+                                                <td className="p-6 text-white">{p.id}</td>
+                                                <td className="p-6">
+                                                    <p className="font-bold text-white uppercase">{p.sender_name}</p>
+                                                    <p className="text-muted opacity-50">{p.email || 'NO_EMAIL'}</p>
                                                 </td>
-                                                <td className="p-4">{p.amount?.toLocaleString()}원</td>
-                                                <td className="p-4">
+                                                <td className="p-6">
+                                                    <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded-md border border-green-500/20 uppercase">
+                                                        {p.plan_name || 'PRO_PROTOCOL'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-6 text-accent">₩{p.amount.toLocaleString()}</td>
+                                                <td className="p-6 text-yellow-400">PENDING_VRF</td>
+                                                <td className="p-6">
                                                     <button
                                                         onClick={() => handleApprove(p.id)}
-                                                        className="bg-green-600 hover:bg-green-500 px-4 py-2 rounded text-sm font-bold"
+                                                        className="px-4 py-2 bg-accent text-black rounded-lg font-black tracking-widest uppercase hover:shadow-[0_0_15px_rgba(0,242,255,0.4)] transition-all"
                                                     >
-                                                        승인
+                                                        APPROVE
                                                     </button>
                                                 </td>
                                             </tr>
                                         ))}
-                                        {payments.length === 0 && (
-                                            <tr>
-                                                <td colSpan={6} className="p-8 text-center text-gray-500">
-                                                    대기 중인 결제가 없습니다
-                                                </td>
-                                            </tr>
-                                        )}
                                     </tbody>
                                 </table>
+                                {payments.length === 0 && (
+                                    <div className="p-20 text-center">
+                                        <CheckCircle size={48} className="mx-auto text-accent/20 mb-4" />
+                                        <p className="font-mono text-xs text-muted uppercase tracking-[0.2em]">All Settlements Synchronized</p>
+                                    </div>
+                                )}
                             </div>
-                        </div>
+                        </motion.div>
                     )}
 
                     {activeTab === 'users' && (
-                        <div>
-                            <h1 className="text-2xl font-bold mb-8">회원 관리</h1>
-                            <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-                                <table className="w-full">
-                                    <thead className="bg-gray-800">
+                        <motion.div
+                            key="users"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden"
+                        >
+                            <div className="p-8 border-b border-white/10">
+                                <h1 className="font-display text-2xl font-black italic tracking-tighter uppercase">USER <span className="text-blue-400">MANIFEST</span></h1>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left font-mono text-[10px]">
+                                    <thead className="bg-white/5 border-b border-white/10 uppercase tracking-widest text-muted">
                                         <tr>
-                                            <th className="text-left p-4">ID</th>
-                                            <th className="text-left p-4">이메일</th>
-                                            <th className="text-left p-4">플랜</th>
-                                            <th className="text-left p-4">구독상태</th>
-                                            <th className="text-left p-4">만료일</th>
-                                            <th className="text-left p-4">가입일</th>
+                                            <th className="p-6">Entity_ID</th>
+                                            <th className="p-6">Communication_Uplink</th>
+                                            <th className="p-6">Role_Tier</th>
+                                            <th className="p-6">Subscription_Status</th>
+                                            <th className="p-6">Registry_Date</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {users.map((u: any) => (
-                                            <tr key={u.id} className="border-t border-gray-800 hover:bg-gray-800/50">
-                                                <td className="p-4">{u.id}</td>
-                                                <td className="p-4">{u.email}</td>
-                                                <td className="p-4">
-                                                    <span className={`text-xs px-2 py-1 rounded ${u.role === 'elite' ? 'bg-purple-600' :
-                                                        u.role === 'pro' ? 'bg-green-600' : 'bg-gray-600'
-                                                        }`}>
-                                                        {u.role === 'elite' ? '엘리트' : u.role === 'pro' ? '프로' : '무료'}
+                                    <tbody className="divide-y divide-white/5">
+                                        {users.map((u) => (
+                                            <tr key={u.id} className="hover:bg-white/5 transition-colors">
+                                                <td className="p-6 text-white">{u.id}</td>
+                                                <td className="p-6 text-blue-400">{u.email}</td>
+                                                <td className="p-6">
+                                                    <span className={cn(
+                                                        "px-2 py-1 rounded-md border uppercase",
+                                                        u.role === 'admin' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
+                                                            u.role === 'pro' ? "bg-green-500/10 text-green-400 border-green-500/20" :
+                                                                "bg-white/5 text-muted border-white/10"
+                                                    )}>
+                                                        {u.role}
                                                     </span>
                                                 </td>
-                                                <td className="p-4">
-                                                    <span className={`text-xs px-2 py-1 rounded ${u.subscription_status === 'active' ? 'bg-green-600' :
-                                                        u.subscription_status === 'expired' ? 'bg-red-600' : 'bg-gray-600'
-                                                        }`}>
-                                                        {u.subscription_status === 'active' ? '활성' :
-                                                            u.subscription_status === 'expired' ? '만료' : '무료'}
+                                                <td className="p-6">
+                                                    <span className={cn(
+                                                        "px-2 py-1 rounded-md uppercase",
+                                                        u.subscription_status === 'active' ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
+                                                    )}>
+                                                        {u.subscription_status || 'INACTIVE'}
                                                     </span>
                                                 </td>
-                                                <td className="p-4 text-gray-400">
-                                                    {u.subscription_expires_at
-                                                        ? new Date(u.subscription_expires_at).toLocaleDateString()
-                                                        : '-'}
-                                                </td>
-                                                <td className="p-4 text-gray-400">{new Date(u.created_at).toLocaleDateString()}</td>
+                                                <td className="p-6 text-muted">{new Date(u.created_at).toLocaleDateString()}</td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
+                        </motion.div>
                     )}
-                </main>
-            </div>
-        </div>
-    );
-}
-
-function StatCard({ title, value, suffix, color }: { title: string; value: number | string; suffix: string; color: string }) {
-    const colors: Record<string, string> = {
-        blue: 'from-blue-600 to-blue-800',
-        green: 'from-green-600 to-green-800',
-        yellow: 'from-yellow-600 to-yellow-800',
-        purple: 'from-purple-600 to-purple-800'
-    };
-
-    return (
-        <div className={`bg-gradient-to-br ${colors[color]} p-6 rounded-xl`}>
-            <p className="text-sm text-white/70">{title}</p>
-            <p className="text-3xl font-black mt-2">{value}<span className="text-lg font-normal ml-1">{suffix}</span></p>
+                </AnimatePresence>
+            </main>
         </div>
     );
 }

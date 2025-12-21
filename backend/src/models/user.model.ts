@@ -1,5 +1,4 @@
 import { pool } from '../config/database';
-import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 export interface User {
     id?: number;
@@ -12,22 +11,22 @@ export interface User {
 
 export const UserModel = {
     async findByEmail(email: string): Promise<User | null> {
-        const [rows] = await pool.execute<RowDataPacket[]>('SELECT * FROM users WHERE email = ?', [email]);
-        if (rows.length === 0) return null;
-        return rows[0] as User;
+        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (result.rows.length === 0) return null;
+        return result.rows[0] as User;
     },
 
     async create(user: User): Promise<number> {
-        const [result] = await pool.execute<ResultSetHeader>(
-            'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)',
+        const result = await pool.query(
+            'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id',
             [user.email, user.password_hash, user.role]
         );
-        return result.insertId;
+        return result.rows[0].id;
     },
 
     async findById(id: number): Promise<User | null> {
-        const [rows] = await pool.execute<RowDataPacket[]>('SELECT * FROM users WHERE id = ?', [id]);
-        if (rows.length === 0) return null;
-        return rows[0] as User;
+        const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+        if (result.rows.length === 0) return null;
+        return result.rows[0] as User;
     }
 };

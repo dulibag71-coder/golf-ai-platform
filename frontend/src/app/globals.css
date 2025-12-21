@@ -1,26 +1,98 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ProView AI Tokens */
+  --neon-green: #39FF14;
+  --lime-green: #7FFF00;
+  --deep-charcoal: #050505;
+  --background: #050505;
+  --foreground: #E8E8E8;
+  --card: #0a0a0a;
+  --card-border: #1a1a1a;
+  --accent: var(--neon-green);
+  --accent-glow: rgba(57, 255, 20, 0.15);
+  --muted: #888888;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-card: var(--card);
+  --color-accent: var(--accent);
+  --color-neon-green: var(--neon-green);
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Pretentard', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  /* ProView AI Grid Pattern */
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Bento Grid Utilities */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.bento-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+
+.bento-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-glow), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.bento-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 20px var(--accent-glow), inset 0 0 10px var(--accent-glow);
+  transform: translateY(-2px);
+}
+
+.bento-card:hover::before {
+  opacity: 1;
+}
+
+.neon-glow {
+  text-shadow: 0 0 10px var(--accent-glow), 0 0 20px rgba(57, 255, 20, 0.1);
+}
+
+.tech-glow {
+  text-shadow: 0 0 10px var(--accent-glow);
+}
+
+.cyber-border {
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(10px);
+}
+
+.neon-border {
+  border: 2px solid var(--neon-green);
+  box-shadow: 0 0 10px var(--accent-glow);
 }

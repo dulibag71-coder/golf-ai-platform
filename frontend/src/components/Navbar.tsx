@@ -1,11 +1,16 @@
 'use client';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Menu, X, User, LogOut, ChevronRight } from 'lucide-react';
+import AnimatedButton from './ui/AnimatedButton';
+import { cn } from '@/lib/utils';
 
 export default function Navbar() {
     const [token, setToken] = useState<string | null>(null);
     const [userRole, setUserRole] = useState<string>('user');
     const [menuOpen, setMenuOpen] = useState(false);
+    const [scrolled, setScrolled] = useState(false);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -13,6 +18,10 @@ export default function Navbar() {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             setUserRole(user.role || 'user');
         }
+
+        const handleScroll = () => setScrolled(window.scrollY > 20);
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
     const handleLogout = () => {
@@ -21,110 +30,132 @@ export default function Navbar() {
         window.location.href = '/login';
     };
 
-    // 유료 플랜 여부
     const isPaid = userRole !== 'user';
     const isClub = userRole.startsWith('club');
 
+    const navLinks = [
+        { name: '분석', href: '/dashboard' },
+        { name: 'AI 코치', href: '/coach' },
+        ...(isPaid ? [
+            { name: '1:1 레슨', href: '/lesson', highlight: true },
+            { name: '대회 코칭', href: '/tournament', highlight: true }
+        ] : []),
+        ...(isClub ? [{ name: '팀 대시보드', href: '/team', blue: true }] : []),
+        { name: '요금제', href: '/pricing' }
+    ];
+
     return (
-        <nav className="fixed w-full z-50 bg-black/80 backdrop-blur-md border-b border-white/10">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16">
-                    <div className="flex items-center">
-                        <Link href="/" className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-600">
-                            Golfing
+        <nav className={cn(
+            "fixed w-full z-50 transition-all duration-300 border-b",
+            scrolled ? "bg-black/90 backdrop-blur-xl border-white/10 py-2" : "bg-transparent border-transparent py-4"
+        )}>
+            <div className="max-w-7xl mx-auto px-6">
+                <div className="flex items-center justify-between h-12">
+                    <div className="flex items-center gap-12">
+                        <Link href="/" className="group flex items-center gap-3">
+                            <div className="w-9 h-9 bg-accent rounded-lg flex items-center justify-center transform group-hover:rotate-[180deg] transition-all duration-500 shadow-[0_0_15px_var(--accent-glow)]">
+                                <span className="text-black font-black text-sm italic">G</span>
+                            </div>
+                            <span className="text-2xl font-display font-black tracking-tighter tech-glow italic">GOLFING<span className="text-white">AI</span></span>
                         </Link>
-                        <div className="hidden md:flex ml-10 items-baseline space-x-1">
-                            <Link href="/dashboard" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
-                                분석
-                            </Link>
-                            <Link href="/coach" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
-                                AI 코치
-                            </Link>
-                            {isPaid && (
-                                <>
-                                    <Link href="/lesson" className="text-purple-400 hover:text-purple-300 px-3 py-2 rounded-md text-sm font-medium">
-                                        1:1 레슨
-                                    </Link>
-                                    <Link href="/tournament" className="text-purple-400 hover:text-purple-300 px-3 py-2 rounded-md text-sm font-medium">
-                                        대회 코칭
-                                    </Link>
-                                </>
-                            )}
-                            {isClub && (
-                                <Link href="/team" className="text-blue-400 hover:text-blue-300 px-3 py-2 rounded-md text-sm font-medium">
-                                    팀 대시보드
-                                </Link>
-                            )}
-                            <Link href="/pricing" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
-                                요금제
-                            </Link>
-                        </div>
-                    </div>
-                    <div className="hidden md:block">
-                        <div className="ml-4 flex items-center md:ml-6 space-x-4">
-                            {token ? (
-                                <>
-                                    {isPaid && (
-                                        <span className={`text-xs px-2 py-1 rounded ${userRole === 'elite' ? 'bg-purple-600' :
-                                            isClub ? 'bg-blue-600' : 'bg-green-600'
-                                            }`}>
-                                            {userRole === 'elite' ? '엘리트' :
-                                                userRole === 'club_starter' ? '동호회' :
-                                                    userRole === 'club_pro' ? '동호회 프로' :
-                                                        userRole === 'pro' ? '프로' : ''}
-                                        </span>
+
+                        <div className="hidden md:flex items-center space-x-8">
+                            {navLinks.map((link) => (
+                                <Link
+                                    key={link.href}
+                                    href={link.href}
+                                    className={cn(
+                                        "text-xs font-mono uppercase tracking-widest transition-colors hover:text-accent",
+                                        link.highlight ? "text-accent" :
+                                            link.blue ? "text-blue-400" : "text-muted"
                                     )}
-                                    <button onClick={handleLogout} className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
-                                        로그아웃
-                                    </button>
-                                    <Link href="/profile" className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-full text-sm font-medium transition">
-                                        내 프로필
-                                    </Link>
-                                </>
-                            ) : (
-                                <>
-                                    <Link href="/login" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
-                                        로그인
-                                    </Link>
-                                    <Link href="/register" className="bg-white text-black hover:bg-gray-200 px-4 py-2 rounded-full text-sm font-bold transition">
-                                        시작하기
-                                    </Link>
-                                </>
-                            )}
+                                >
+                                    {link.name}
+                                </Link>
+                            ))}
                         </div>
                     </div>
-                    {/* 모바일 메뉴 버튼 */}
+
+                    <div className="hidden md:flex items-center space-x-6">
+                        {token ? (
+                            <div className="flex items-center gap-4">
+                                {isPaid && (
+                                    <span className="font-mono text-[10px] px-2 py-0.5 border border-accent/30 text-accent rounded uppercase">
+                                        {userRole}
+                                    </span>
+                                )}
+                                <button onClick={handleLogout} className="text-muted hover:text-white transition-colors">
+                                    <LogOut size={18} />
+                                </button>
+                                <Link href="/profile">
+                                    <AnimatedButton size="sm" variant="outline">
+                                        PROFILE
+                                    </AnimatedButton>
+                                </Link>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-6">
+                                <Link href="/login" className="text-xs font-mono text-muted hover:text-white uppercase tracking-widest">
+                                    LOGIN
+                                </Link>
+                                <Link href="/register">
+                                    <AnimatedButton size="sm">
+                                        START PROJECT
+                                    </AnimatedButton>
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+
                     <div className="md:hidden">
-                        <button onClick={() => setMenuOpen(!menuOpen)} className="text-gray-300 p-2">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={menuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
-                            </svg>
+                        <button onClick={() => setMenuOpen(!menuOpen)} className="text-white p-2">
+                            {menuOpen ? <X size={24} /> : <Menu size={24} />}
                         </button>
                     </div>
                 </div>
-                {/* 모바일 메뉴 */}
-                {menuOpen && (
-                    <div className="md:hidden pb-4 space-y-2">
-                        <Link href="/dashboard" className="block text-gray-300 hover:text-white px-3 py-2">분석</Link>
-                        <Link href="/coach" className="block text-gray-300 hover:text-white px-3 py-2">AI 코치</Link>
-                        {isPaid && <Link href="/lesson" className="block text-purple-400 px-3 py-2">1:1 레슨</Link>}
-                        {isPaid && <Link href="/tournament" className="block text-purple-400 px-3 py-2">대회 코칭</Link>}
-                        {isClub && <Link href="/team" className="block text-blue-400 px-3 py-2">팀 대시보드</Link>}
-                        <Link href="/pricing" className="block text-gray-300 hover:text-white px-3 py-2">요금제</Link>
-                        {token ? (
-                            <>
-                                <Link href="/profile" className="block text-green-400 px-3 py-2">내 프로필</Link>
-                                <button onClick={handleLogout} className="block text-gray-300 px-3 py-2">로그아웃</button>
-                            </>
-                        ) : (
-                            <>
-                                <Link href="/login" className="block text-gray-300 px-3 py-2">로그인</Link>
-                                <Link href="/register" className="block text-white bg-green-600 mx-3 py-2 rounded-lg text-center">시작하기</Link>
-                            </>
-                        )}
-                    </div>
-                )}
             </div>
-        </nav>
+
+            {/* Mobile Menu */}
+            <AnimatePresence>
+                {menuOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="absolute top-full left-0 w-full bg-black border-b border-white/10 p-6 md:hidden"
+                    >
+                        <div className="flex flex-col space-y-4">
+                            {navLinks.map((link) => (
+                                <Link
+                                    key={link.href}
+                                    href={link.href}
+                                    onClick={() => setMenuOpen(false)}
+                                    className="flex items-center justify-between text-muted hover:text-white py-2 group"
+                                >
+                                    <span className="font-mono text-sm uppercase tracking-widest">{link.name}</span>
+                                    <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </Link>
+                            ))}
+                            <div className="pt-4 border-t border-white/5 space-y-4">
+                                {token ? (
+                                    <>
+                                        <Link href="/profile" onClick={() => setMenuOpen(false)}>
+                                            <AnimatedButton className="w-full">MY DASHBOARD</AnimatedButton>
+                                        </Link>
+                                        <button onClick={handleLogout} className="w-full text-center text-red-400 font-mono text-xs uppercase pt-2">
+                                            DISCONNECT
+                                        </button>
+                                    </>
+                                ) : (
+                                    <Link href="/register" onClick={() => setMenuOpen(false)}>
+                                        <AnimatedButton className="w-full">INITIALIZE ACCESS</AnimatedButton>
+                                    </Link>
+                                )}
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </nav >
     );
 }

@@ -1,8 +1,14 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import BentoCard from '@/components/ui/BentoCard';
+import AnimatedButton from '@/components/ui/AnimatedButton';
+import { Trophy, Target, Calendar, Activity, ChevronRight, Plus, Brain, Map, Activity as Physical, Percent } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 interface Tournament {
     id: number;
@@ -22,259 +28,282 @@ interface TrainingProgress {
     total_tasks: number;
 }
 
+const programs = [
+    { id: 'mental', title: '멘탈 트레이닝', icon: <Brain />, description: '대회 압박감 극복, 집중력 향상', weeks: 4 },
+    { id: 'strategy', title: '코스 전략', icon: <Map />, description: '코스 공략법, 클럽 선택 전략', weeks: 3 },
+    { id: 'physical', title: '피지컬 컨디셔닝', icon: <Physical />, description: '체력 관리, 부상 예방', weeks: 6 },
+    { id: 'scoring', title: '스코어링 집중', icon: <Target />, description: '숏게임, 퍼팅 마스터', weeks: 4 }
+];
+
 export default function TournamentCoachPage() {
-    const [userRole, setUserRole] = useState('user');
-    const [activeProgram, setActiveProgram] = useState<string | null>(null);
-    const [tournaments, setTournaments] = useState<Tournament[]>([]);
-    const [trainingProgress, setTrainingProgress] = useState<TrainingProgress[]>([]);
+    const queryClient = useQueryClient();
+    const [activeProgramId, setActiveProgramId] = useState<string | null>(null);
     const [tournamentName, setTournamentName] = useState('');
     const [tournamentDate, setTournamentDate] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [startingProgram, setStartingProgram] = useState(false);
 
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            const fetchData = async () => {
-                try {
-                    const userData = await api.get('/auth/me', token);
-                    if (userData?.role) setUserRole(userData.role);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
-                    const tournamentsData = await api.get('/tournament', token);
-                    if (tournamentsData) setTournaments(tournamentsData);
+    // Queries
+    const { data: user } = useQuery({
+        queryKey: ['user'],
+        queryFn: () => api.get('/auth/me', token || ''),
+        enabled: !!token
+    });
 
-                    const trainingData = await api.get('/training', token);
-                    if (trainingData) setTrainingProgress(trainingData);
-                } catch {
-                    const user = JSON.parse(localStorage.getItem('user') || '{}');
-                    setUserRole(user.role || 'user');
-                }
-            };
-            fetchData();
-        }
-    }, []);
+    const { data: tournaments = [], isLoading: loadingTournaments } = useQuery({
+        queryKey: ['tournaments'],
+        queryFn: () => api.get('/tournament', token || ''),
+        enabled: !!token
+    });
 
-    const isPaid = userRole !== 'user';
+    const { data: trainingProgress = [], isLoading: loadingTraining } = useQuery({
+        queryKey: ['training'],
+        queryFn: () => api.get('/training', token || ''),
+        enabled: !!token
+    });
 
-    const programs = [
-        { id: 'mental', title: '멘탈 트레이닝', icon: '🧠', description: '대회 압박감 극복, 집중력 향상', weeks: 4 },
-        { id: 'strategy', title: '코스 전략', icon: '🗺️', description: '코스 공략법, 클럽 선택 전략', weeks: 3 },
-        { id: 'physical', title: '피지컬 컨디셔닝', icon: '💪', description: '체력 관리, 부상 예방', weeks: 6 },
-        { id: 'scoring', title: '스코어링 집중', icon: '🎯', description: '숏게임, 퍼팅 마스터', weeks: 4 }
-    ];
-
-    const handleRegisterTournament = async () => {
-        if (!tournamentName || !tournamentDate) {
-            alert('대회명과 날짜를 입력해주세요.');
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const token = localStorage.getItem('token');
-            await api.post('/tournament', {
-                tournamentName,
-                tournamentDate,
-                programType: activeProgram || 'general'
-            }, token || '');
-
-            alert('대회가 등록되었습니다!');
+    // Mutations
+    const registerTournament = useMutation({
+        mutationFn: (data: any) => api.post('/tournament', data, token || ''),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tournaments'] });
             setTournamentName('');
             setTournamentDate('');
-
-            const tournamentsData = await api.get('/tournament', token || '');
-            if (tournamentsData) setTournaments(tournamentsData);
-        } catch (error) {
-            alert('등록에 실패했습니다.');
-        } finally {
-            setLoading(false);
         }
-    };
+    });
 
-    const handleStartProgram = async () => {
-        if (!activeProgram) return;
-
-        const program = programs.find(p => p.id === activeProgram);
-        if (!program) return;
-
-        setStartingProgram(true);
-        try {
-            const token = localStorage.getItem('token');
-            const result = await api.post('/training', {
-                programId: program.id,
-                programName: program.title,
-                weeks: program.weeks
-            }, token || '');
-
-            alert(result.message || '프로그램이 시작되었습니다! 이메일로 커리큘럼이 발송됩니다.');
-
-            const trainingData = await api.get('/training', token || '');
-            if (trainingData) setTrainingProgress(trainingData);
-        } catch (error) {
-            alert('프로그램 시작에 실패했습니다.');
-        } finally {
-            setStartingProgram(false);
+    const startProgram = useMutation({
+        mutationFn: (data: any) => api.post('/training', data, token || ''),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['training'] });
         }
-    };
+    });
 
-    const updateProgress = async (progressId: number, newTasksCompleted: number, weekNumber: number) => {
-        try {
-            const token = localStorage.getItem('token');
-            await api.put('/training', {
-                progressId,
-                tasksCompleted: newTasksCompleted,
-                weekNumber
-            }, token || '');
-
-            const trainingData = await api.get('/training', token || '');
-            if (trainingData) setTrainingProgress(trainingData);
-        } catch (error) {
-            console.error('Progress update failed');
+    const updateProgress = useMutation({
+        mutationFn: (data: any) => api.put('/training', data, token || ''),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['training'] });
         }
-    };
+    });
+
+    const userRole = user?.role || 'user';
+    const isPaid = userRole !== 'user';
+
+    const latestTournament = useMemo(() => {
+        if (!tournaments.length) return null;
+        return [...tournaments].sort((a, b) => new Date(a.tournament_date).getTime() - new Date(b.tournament_date).getTime())[0];
+    }, [tournaments]);
+
+    const dDay = latestTournament ? Math.ceil((new Date(latestTournament.tournament_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
 
     if (!isPaid) {
         return (
-            <div className="min-h-screen bg-black text-white">
+            <div className="min-h-screen bg-black">
                 <Navbar />
-                <div className="max-w-xl mx-auto px-4 pt-24 text-center">
-                    <div className="bg-gray-900 rounded-2xl p-8 border border-gray-800">
-                        <h1 className="text-3xl font-bold mb-4">🔒 유료 플랜 전용</h1>
-                        <p className="text-gray-400 mb-6">대회 준비 코칭은 프로 플랜 이상에서 이용 가능합니다.</p>
-                        <Link href="/pricing" className="inline-block bg-green-600 hover:bg-green-500 px-8 py-3 rounded-xl font-bold">
-                            플랜 업그레이드 →
+                <div className="max-w-xl mx-auto px-6 pt-32 text-center">
+                    <BentoCard icon={<Trophy />} title="ACCESS DENIED" subtitle="유료 플랜 전용">
+                        <p className="text-muted text-sm mt-4 mb-8">대회 준비 코칭은 프로 플랜 이상에서 이용 가능합니다.</p>
+                        <Link href="/pricing">
+                            <AnimatedButton className="w-full">플랜 업그레이드 →</AnimatedButton>
                         </Link>
-                    </div>
+                    </BentoCard>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-black text-white">
+        <div className="min-h-screen bg-black text-white font-sans">
             <Navbar />
-            <div className="max-w-4xl mx-auto px-4 pt-24 pb-16">
-                <h1 className="text-3xl font-bold mb-2 text-purple-400">🏆 대회 준비 코칭</h1>
-                <p className="text-gray-400 mb-8">목표 대회에 맞춘 전문 트레이닝 프로그램</p>
 
-                {/* 진행 중인 훈련 */}
-                {trainingProgress.length > 0 && (
-                    <div className="bg-purple-900/20 border border-purple-500 rounded-2xl p-6 mb-8">
-                        <h3 className="text-lg font-bold mb-4">📊 진행 중인 훈련</h3>
-                        <div className="space-y-4">
-                            {trainingProgress.map(tp => (
-                                <div key={tp.id} className="bg-gray-800 p-4 rounded-xl">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="font-bold">{tp.program_name}</span>
-                                        <span className="text-sm text-gray-400">{tp.week_number}/{tp.total_weeks}주차</span>
-                                    </div>
-                                    <div className="w-full bg-gray-700 rounded-full h-3 mb-2">
-                                        <div
-                                            className="bg-purple-600 h-3 rounded-full transition-all"
-                                            style={{ width: `${(tp.tasks_completed / tp.total_tasks) * 100}%` }}
-                                        />
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-gray-400">완료: {tp.tasks_completed}/{tp.total_tasks}</span>
-                                        <button
-                                            onClick={() => updateProgress(tp.id, tp.tasks_completed + 1, tp.week_number)}
-                                            className="text-sm bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded"
-                                        >
-                                            +1 완료
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* 프로그램 선택 */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                    {programs.map(prog => {
-                        const isActive = trainingProgress.some(tp => tp.program_id === prog.id);
-                        return (
-                            <button
-                                key={prog.id}
-                                onClick={() => setActiveProgram(activeProgram === prog.id ? null : prog.id)}
-                                disabled={isActive}
-                                className={`p-6 rounded-2xl text-left transition ${isActive ? 'bg-green-900/30 border border-green-500' :
-                                        activeProgram === prog.id ? 'bg-purple-900/30 border-2 border-purple-500' :
-                                            'bg-gray-900 border border-gray-800 hover:border-gray-600'
-                                    } ${isActive ? 'opacity-70' : ''}`}
-                            >
-                                <div className="flex items-center gap-3 mb-2">
-                                    <span className="text-3xl">{prog.icon}</span>
-                                    <h3 className="text-xl font-bold">{prog.title}</h3>
-                                    {isActive && <span className="text-xs bg-green-600 px-2 py-1 rounded">진행 중</span>}
-                                </div>
-                                <p className="text-gray-400 text-sm">{prog.description}</p>
-                                <p className="text-purple-400 text-sm mt-2">{prog.weeks}주 프로그램</p>
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {activeProgram && !trainingProgress.some(tp => tp.program_id === activeProgram) && (
-                    <button
-                        onClick={handleStartProgram}
-                        disabled={startingProgram}
-                        className="w-full mb-8 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 py-4 rounded-xl font-bold"
+            <main className="max-w-7xl mx-auto px-6 pt-24 pb-16">
+                <header className="mb-12">
+                    <motion.h1
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="text-4xl font-bold tracking-tighter tech-glow mb-2"
                     >
-                        {startingProgram ? '시작 중...' : `${programs.find(p => p.id === activeProgram)?.title} 프로그램 시작하기`}
-                    </button>
-                )}
+                        MISSION CONTROL
+                    </motion.h1>
+                    <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted flex items-center gap-2">
+                        <Activity size={12} className="text-accent animate-pulse" /> TOURNAMENT COACHING SYSTEM ACTIVE
+                    </p>
+                </header>
 
-                {/* 대회 등록 */}
-                <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 mb-8">
-                    <h3 className="text-lg font-bold mb-4">📅 목표 대회 등록</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <input
-                            type="text"
-                            value={tournamentName}
-                            onChange={(e) => setTournamentName(e.target.value)}
-                            placeholder="대회명 (예: 2024 아마추어 선수권)"
-                            className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3"
-                        />
-                        <input
-                            type="date"
-                            value={tournamentDate}
-                            onChange={(e) => setTournamentDate(e.target.value)}
-                            className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3"
-                        />
-                    </div>
-                    <button
-                        onClick={handleRegisterTournament}
-                        disabled={loading}
-                        className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600 px-6 py-3 rounded-xl font-bold"
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    {/* Main Tournament Status */}
+                    <BentoCard
+                        className="md:col-span-2 md:row-span-2"
+                        icon={<Trophy className="text-accent" />}
+                        title="CURRENT OBJECTIVE"
+                        subtitle={latestTournament?.tournament_name || "등록된 대회 없음"}
                     >
-                        {loading ? '등록 중...' : '대회 등록'}
-                    </button>
-                </div>
+                        {latestTournament ? (
+                            <div className="mt-6">
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-7xl font-black italic tech-glow">D-{dDay}</span>
+                                    <span className="text-muted uppercase font-mono text-xs">REMAINING DAYS</span>
+                                </div>
+                                <p className="text-muted mt-4 font-mono text-xs flex items-center gap-2">
+                                    <Calendar size={14} /> TARGET DATE: {new Date(latestTournament.tournament_date).toLocaleDateString()}
+                                </p>
+                            </div>
+                        ) : (
+                            <p className="text-muted mt-4 text-sm">목표 대회를 등록하고 훈련을 시작하세요.</p>
+                        )}
+                    </BentoCard>
 
-                {/* 등록된 대회 */}
-                {tournaments.length > 0 && (
-                    <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6">
-                        <h3 className="text-lg font-bold mb-4">🎯 나의 목표 대회</h3>
-                        <ul className="space-y-3">
-                            {tournaments.map(t => {
-                                const dDay = Math.ceil((new Date(t.tournament_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                                return (
-                                    <li key={t.id} className="bg-gray-800 p-4 rounded-xl flex justify-between items-center">
-                                        <div>
-                                            <p className="font-bold">{t.tournament_name}</p>
-                                            <p className="text-sm text-gray-400">{new Date(t.tournament_date).toLocaleDateString()}</p>
+                    {/* Progress Overview */}
+                    <BentoCard
+                        className="md:col-span-2"
+                        icon={<Percent className="text-accent" />}
+                        title="SYSTEM PROGRESS"
+                    >
+                        {trainingProgress.length > 0 ? (
+                            <div className="space-y-6 mt-4">
+                                {trainingProgress.map((tp: TrainingProgress) => (
+                                    <div key={tp.id} className="group/item">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-mono uppercase text-muted group-hover/item:text-white transition-colors">
+                                                {tp.program_name}
+                                            </span>
+                                            <span className="text-[10px] font-mono text-accent">
+                                                {Math.round((tp.tasks_completed / tp.total_tasks) * 100)}%
+                                            </span>
                                         </div>
-                                        <span className={`text-xs px-2 py-1 rounded ${dDay > 0 ? 'bg-green-600' : 'bg-red-600'}`}>
-                                            {dDay > 0 ? `D-${dDay}` : '종료'}
-                                        </span>
-                                    </li>
+                                        <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                                            <motion.div
+                                                className="h-full bg-accent"
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${(tp.tasks_completed / tp.total_tasks) * 100}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-muted text-sm mt-4">활성화된 훈련 프로그램이 없습니다.</p>
+                        )}
+                    </BentoCard>
+
+                    {/* Quick Stats */}
+                    <BentoCard className="md:col-span-1" icon={<Activity />} title="STATUS">
+                        <div className="mt-2">
+                            <span className="text-2xl font-bold block">OPERATIONAL</span>
+                            <span className="text-[10px] text-accent font-mono">LATENCY: 24ms</span>
+                        </div>
+                    </BentoCard>
+                    <BentoCard className="md:col-span-1" icon={<Target />} title="RANKING">
+                        <div className="mt-2">
+                            <span className="text-2xl font-bold block">ELITE</span>
+                            <span className="text-[10px] text-accent font-mono">TOP 5% IN REGION</span>
+                        </div>
+                    </BentoCard>
+
+                    {/* Training Programs */}
+                    <div className="md:col-span-4 mt-8">
+                        <h2 className="font-mono text-xs uppercase tracking-widest text-muted mb-6 flex items-center gap-4">
+                            AVAILABLE MODULES <div className="h-[1px] flex-1 bg-white/10" />
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            {programs.map(prog => {
+                                const isActive = trainingProgress.some((tp: TrainingProgress) => tp.program_id === prog.id);
+                                return (
+                                    <button
+                                        key={prog.id}
+                                        onClick={() => setActiveProgramId(activeProgramId === prog.id ? null : prog.id)}
+                                        disabled={isActive}
+                                        className={cn(
+                                            "bento-card text-left p-6 transition-all",
+                                            isActive && "opacity-50 grayscale border-white/5",
+                                            activeProgramId === prog.id && "border-accent ring-1 ring-accent"
+                                        )}
+                                    >
+                                        <div className="text-2xl mb-4 text-accent">{prog.icon}</div>
+                                        <h3 className="font-bold text-sm mb-1">{prog.title}</h3>
+                                        <p className="text-[10px] text-muted uppercase tracking-tighter mb-4">{prog.weeks} WEEK PROGRAM</p>
+                                        {isActive ? (
+                                            <span className="text-[10px] font-mono text-accent">ALREADY INITIALIZED</span>
+                                        ) : (
+                                            <div className="flex items-center gap-1 text-[10px] font-mono text-muted group-hover:text-white transition-colors">
+                                                INITIALIZE <ChevronRight size={12} />
+                                            </div>
+                                        )}
+                                    </button>
                                 );
                             })}
-                        </ul>
+                        </div>
+
+                        {activeProgramId && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mt-6 flex justify-end"
+                            >
+                                <AnimatedButton
+                                    onClick={() => startProgram.mutate({
+                                        programId: activeProgramId,
+                                        programName: programs.find(p => p.id === activeProgramId)?.title || '',
+                                        weeks: programs.find(p => p.id === activeProgramId)?.weeks || 0
+                                    })}
+                                    disabled={startProgram.isPending}
+                                >
+                                    {startProgram.isPending ? 'INITIALIZING...' : 'START MODULE'}
+                                </AnimatedButton>
+                            </motion.div>
+                        )}
                     </div>
-                )}
-            </div>
+
+                    {/* Tournament Registration & List Side-by-Side */}
+                    <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                        <BentoCard title="REGISTER MISSION" icon={<Plus />}>
+                            <div className="space-y-4 mt-4">
+                                <input
+                                    type="text"
+                                    value={tournamentName}
+                                    onChange={(e) => setTournamentName(e.target.value)}
+                                    placeholder="MISSION NAME"
+                                    className="w-full bg-white/5 border border-white/10 rounded px-4 py-3 font-mono text-xs focus:border-accent focus:outline-none transition-colors"
+                                />
+                                <input
+                                    type="date"
+                                    value={tournamentDate}
+                                    onChange={(e) => setTournamentDate(e.target.value)}
+                                    className="w-full bg-white/5 border border-white/10 rounded px-4 py-3 font-mono text-xs focus:border-accent focus:outline-none transition-colors"
+                                />
+                                <AnimatedButton
+                                    className="w-full"
+                                    onClick={() => registerTournament.mutate({
+                                        tournamentName,
+                                        tournamentDate,
+                                        programType: 'general'
+                                    })}
+                                    disabled={!tournamentName || !tournamentDate || registerTournament.isPending}
+                                >
+                                    LOG MISSION
+                                </AnimatedButton>
+                            </div>
+                        </BentoCard>
+
+                        <BentoCard title="MISSION ARCHIVE" icon={<Activity />}>
+                            <div className="space-y-2 mt-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                {tournaments.map((t: Tournament) => (
+                                    <div key={t.id} className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded hover:border-white/20 transition-colors group">
+                                        <div className="flex flex-col">
+                                            <span className="font-mono text-xs uppercase group-hover:text-accent transition-colors">{t.tournament_name}</span>
+                                            <span className="text-[10px] text-muted">{new Date(t.tournament_date).toLocaleDateString()}</span>
+                                        </div>
+                                        <div className="text-[10px] font-mono px-2 py-0.5 border border-white/10 rounded">
+                                            {Math.ceil((new Date(t.tournament_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) > 0 ? 'PENDING' : 'COMPLETE'}
+                                        </div>
+                                    </div>
+                                ))}
+                                {tournaments.length === 0 && <p className="text-muted text-xs font-mono">NO MISSIONS LOGGED</p>}
+                            </div>
+                        </BentoCard>
+                    </div>
+                </div>
+            </main>
         </div>
     );
 }
