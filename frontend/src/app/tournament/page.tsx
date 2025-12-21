@@ -1,308 +1,317 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
+import { motion } from 'framer-motion';
 import Navbar from '@/components/Navbar';
-import Link from 'next/link';
-import { api } from '@/lib/api';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import BentoCard from '@/components/ui/BentoCard';
 import AnimatedButton from '@/components/ui/AnimatedButton';
-import { Trophy, Target, Calendar, Activity, ChevronRight, Plus, Brain, Map, Activity as Physical, Percent } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { Trophy, Calendar, Users, Clock, Plus, ChevronRight, Play, Medal, Award, Crown, MapPin } from 'lucide-react';
+import Link from 'next/link';
 
 interface Tournament {
-    id: number;
-    tournament_name: string;
-    tournament_date: string;
-    program_type: string;
-    status: string;
+    id: string;
+    name: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    participants: number;
+    maxParticipants: number;
+    status: 'upcoming' | 'ongoing' | 'completed';
+    prize?: string;
+    type: 'individual' | 'team';
 }
 
-interface TrainingProgress {
-    id: number;
-    program_id: string;
-    program_name: string;
-    week_number: number;
-    total_weeks: number;
-    tasks_completed: number;
-    total_tasks: number;
-}
+export default function TournamentPage() {
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [activeTab, setActiveTab] = useState<'all' | 'my'>('all');
 
-const programs = [
-    { id: 'mental', title: '멘탈 트레이닝', icon: <Brain />, description: '대회 압박감 극복, 집중력 향상', weeks: 4 },
-    { id: 'strategy', title: '코스 전략', icon: <Map />, description: '코스 공략법, 클럽 선택 전략', weeks: 3 },
-    { id: 'physical', title: '피지컬 컨디셔닝', icon: <Physical />, description: '체력 관리, 부상 예방', weeks: 6 },
-    { id: 'scoring', title: '스코어링 집중', icon: <Target />, description: '숏게임, 퍼팅 마스터', weeks: 4 }
-];
+    const tournaments: Tournament[] = [
+        {
+            id: '1',
+            name: '2024 윈터 챔피언십',
+            description: '연말 최대 규모 온라인 토너먼트',
+            startDate: '2024-12-25',
+            endDate: '2024-12-31',
+            participants: 156,
+            maxParticipants: 200,
+            status: 'upcoming',
+            prize: '₩1,000,000',
+            type: 'individual'
+        },
+        {
+            id: '2',
+            name: '드래곤즈 vs 이글스',
+            description: '팀 대항전 시즌 3',
+            startDate: '2024-12-20',
+            endDate: '2024-12-22',
+            participants: 40,
+            maxParticipants: 40,
+            status: 'ongoing',
+            type: 'team'
+        },
+        {
+            id: '3',
+            name: '주간 미니 토너먼트',
+            description: '매주 진행되는 소규모 대회',
+            startDate: '2024-12-18',
+            endDate: '2024-12-19',
+            participants: 32,
+            maxParticipants: 32,
+            status: 'completed',
+            prize: '₩100,000',
+            type: 'individual'
+        },
+    ];
 
-export default function TournamentCoachPage() {
-    const queryClient = useQueryClient();
-    const [activeProgramId, setActiveProgramId] = useState<string | null>(null);
-    const [tournamentName, setTournamentName] = useState('');
-    const [tournamentDate, setTournamentDate] = useState('');
-
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-
-    // Queries
-    const { data: user } = useQuery({
-        queryKey: ['user'],
-        queryFn: () => api.get('/auth/me', token || ''),
-        enabled: !!token
-    });
-
-    const { data: tournaments = [], isLoading: loadingTournaments } = useQuery({
-        queryKey: ['tournaments'],
-        queryFn: () => api.get('/tournament', token || ''),
-        enabled: !!token
-    });
-
-    const { data: trainingProgress = [], isLoading: loadingTraining } = useQuery({
-        queryKey: ['training'],
-        queryFn: () => api.get('/training', token || ''),
-        enabled: !!token
-    });
-
-    // Mutations
-    const registerTournament = useMutation({
-        mutationFn: (data: any) => api.post('/tournament', data, token || ''),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['tournaments'] });
-            setTournamentName('');
-            setTournamentDate('');
+    const getStatusBadge = (status: string) => {
+        switch (status) {
+            case 'upcoming':
+                return <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-[10px] font-bold uppercase rounded">예정</span>;
+            case 'ongoing':
+                return <span className="px-2 py-1 bg-green-500/20 text-green-400 text-[10px] font-bold uppercase rounded flex items-center gap-1"><span className="h-1.5 w-1.5 bg-green-400 rounded-full animate-pulse" />진행중</span>;
+            case 'completed':
+                return <span className="px-2 py-1 bg-gray-500/20 text-gray-400 text-[10px] font-bold uppercase rounded">완료</span>;
+            default:
+                return null;
         }
-    });
+    };
 
-    const startProgram = useMutation({
-        mutationFn: (data: any) => api.post('/training', data, token || ''),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['training'] });
-        }
-    });
-
-    const updateProgress = useMutation({
-        mutationFn: (data: any) => api.put('/training', data, token || ''),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['training'] });
-        }
-    });
-
-    const userRole = user?.role || 'user';
-    const isPaid = userRole !== 'user';
-
-    const latestTournament = useMemo(() => {
-        if (!tournaments.length) return null;
-        return [...tournaments].sort((a, b) => new Date(a.tournament_date).getTime() - new Date(b.tournament_date).getTime())[0];
-    }, [tournaments]);
-
-    const dDay = latestTournament ? Math.ceil((new Date(latestTournament.tournament_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
-
-    if (!isPaid) {
-        return (
-            <div className="min-h-screen bg-black">
-                <Navbar />
-                <div className="max-w-xl mx-auto px-6 pt-32 text-center">
-                    <BentoCard icon={<Trophy />} title="ACCESS DENIED" subtitle="유료 플랜 전용">
-                        <p className="text-muted text-sm mt-4 mb-8">대회 준비 코칭은 프로 플랜 이상에서 이용 가능합니다.</p>
-                        <Link href="/pricing">
-                            <AnimatedButton className="w-full">플랜 업그레이드 →</AnimatedButton>
-                        </Link>
-                    </BentoCard>
-                </div>
-            </div>
-        );
-    }
+    const leaderboard = [
+        { rank: 1, name: '김프로', score: 94, icon: <Crown size={16} className="text-yellow-400" /> },
+        { rank: 2, name: '이마스터', score: 91, icon: <Medal size={16} className="text-gray-300" /> },
+        { rank: 3, name: '박세리', score: 89, icon: <Award size={16} className="text-orange-400" /> },
+    ];
 
     return (
         <div className="min-h-screen bg-black text-white font-sans">
             <Navbar />
 
-            <main className="max-w-7xl mx-auto px-6 pt-24 pb-16">
-                <header className="mb-12">
-                    <motion.h1
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="text-4xl font-bold tracking-tighter tech-glow mb-2"
-                    >
-                        MISSION CONTROL
-                    </motion.h1>
-                    <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted flex items-center gap-2">
-                        <Activity size={12} className="text-accent animate-pulse" /> TOURNAMENT COACHING SYSTEM ACTIVE
-                    </p>
-                </header>
+            <main className="max-w-7xl mx-auto px-6 pt-28 pb-16">
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col md:flex-row md:items-center md:justify-between mb-12"
+                >
+                    <div>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-yellow-500/20 bg-yellow-500/5 text-yellow-400 font-mono text-[10px] tracking-[0.3em] uppercase mb-4">
+                            <Trophy size={12} />
+                            Tournament Arena
+                        </div>
+                        <h1 className="font-display text-4xl font-black tracking-tighter tech-glow italic">
+                            <span className="text-yellow-400">토너먼트</span>
+                        </h1>
+                    </div>
+                    <AnimatedButton variant="primary" onClick={() => setShowCreateModal(true)} className="mt-4 md:mt-0">
+                        <Plus size={16} className="mr-2" />
+                        토너먼트 생성
+                    </AnimatedButton>
+                </motion.div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    {/* Main Tournament Status */}
-                    <BentoCard
-                        className="md:col-span-2 md:row-span-2"
-                        icon={<Trophy className="text-accent" />}
-                        title="CURRENT OBJECTIVE"
-                        subtitle={latestTournament?.tournament_name || "등록된 대회 없음"}
+                {/* Tabs */}
+                <div className="flex gap-4 mb-8">
+                    <button
+                        onClick={() => setActiveTab('all')}
+                        className={`px-6 py-2 rounded-xl font-mono text-sm transition-all ${activeTab === 'all'
+                                ? 'bg-yellow-500 text-black font-bold'
+                                : 'bg-white/5 text-muted hover:text-white'
+                            }`}
                     >
-                        {latestTournament ? (
-                            <div className="mt-6">
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-7xl font-black italic tech-glow">D-{dDay}</span>
-                                    <span className="text-muted uppercase font-mono text-xs">REMAINING DAYS</span>
-                                </div>
-                                <p className="text-muted mt-4 font-mono text-xs flex items-center gap-2">
-                                    <Calendar size={14} /> TARGET DATE: {new Date(latestTournament.tournament_date).toLocaleDateString()}
-                                </p>
-                            </div>
-                        ) : (
-                            <p className="text-muted mt-4 text-sm">목표 대회를 등록하고 훈련을 시작하세요.</p>
-                        )}
-                    </BentoCard>
+                        전체 토너먼트
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('my')}
+                        className={`px-6 py-2 rounded-xl font-mono text-sm transition-all ${activeTab === 'my'
+                                ? 'bg-yellow-500 text-black font-bold'
+                                : 'bg-white/5 text-muted hover:text-white'
+                            }`}
+                    >
+                        내 토너먼트
+                    </button>
+                </div>
 
-                    {/* Progress Overview */}
-                    <BentoCard
-                        className="md:col-span-2"
-                        icon={<Percent className="text-accent" />}
-                        title="SYSTEM PROGRESS"
-                    >
-                        {trainingProgress.length > 0 ? (
-                            <div className="space-y-6 mt-4">
-                                {trainingProgress.map((tp: TrainingProgress) => (
-                                    <div key={tp.id} className="group/item">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className="text-xs font-mono uppercase text-muted group-hover/item:text-white transition-colors">
-                                                {tp.program_name}
-                                            </span>
-                                            <span className="text-[10px] font-mono text-accent">
-                                                {Math.round((tp.tasks_completed / tp.total_tasks) * 100)}%
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Tournament List */}
+                    <div className="lg:col-span-2 space-y-4">
+                        {tournaments.map((tournament, idx) => (
+                            <motion.div
+                                key={tournament.id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: idx * 0.1 }}
+                            >
+                                <BentoCard className={`p-6 hover:border-yellow-500/30 transition-all cursor-pointer ${tournament.status === 'ongoing' ? 'border-green-500/30 bg-green-500/5' : ''
+                                    }`}>
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                {getStatusBadge(tournament.status)}
+                                                <span className="text-[10px] font-mono uppercase text-muted">
+                                                    {tournament.type === 'team' ? '팀전' : '개인전'}
+                                                </span>
+                                            </div>
+                                            <h3 className="font-display text-xl font-black italic">{tournament.name}</h3>
+                                            <p className="text-sm text-muted mt-1">{tournament.description}</p>
+                                        </div>
+                                        {tournament.prize && (
+                                            <div className="text-right">
+                                                <p className="text-[10px] font-mono uppercase text-muted">상금</p>
+                                                <p className="font-display text-lg font-black italic text-yellow-400">{tournament.prize}</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-4 mb-4">
+                                        <div className="flex items-center gap-2 text-muted">
+                                            <Calendar size={14} />
+                                            <span className="text-xs">{new Date(tournament.startDate).toLocaleDateString('ko-KR')}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-muted">
+                                            <Users size={14} />
+                                            <span className="text-xs">{tournament.participants}/{tournament.maxParticipants}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-muted">
+                                            <Clock size={14} />
+                                            <span className="text-xs">
+                                                {tournament.status === 'upcoming' ? '곧 시작' :
+                                                    tournament.status === 'ongoing' ? '진행중' : '종료'}
                                             </span>
                                         </div>
-                                        <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                                            <motion.div
-                                                className="h-full bg-accent"
-                                                initial={{ width: 0 }}
-                                                animate={{ width: `${(tp.tasks_completed / tp.total_tasks) * 100}%` }}
+                                    </div>
+
+                                    {/* Progress Bar */}
+                                    <div className="mb-4">
+                                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full transition-all ${tournament.status === 'ongoing' ? 'bg-green-500' :
+                                                        tournament.status === 'completed' ? 'bg-gray-500' : 'bg-yellow-500'
+                                                    }`}
+                                                style={{ width: `${(tournament.participants / tournament.maxParticipants) * 100}%` }}
                                             />
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-muted text-sm mt-4">활성화된 훈련 프로그램이 없습니다.</p>
-                        )}
-                    </BentoCard>
 
-                    {/* Quick Stats */}
-                    <BentoCard className="md:col-span-1" icon={<Activity />} title="STATUS">
-                        <div className="mt-2">
-                            <span className="text-2xl font-bold block">OPERATIONAL</span>
-                            <span className="text-[10px] text-accent font-mono">LATENCY: 24ms</span>
-                        </div>
-                    </BentoCard>
-                    <BentoCard className="md:col-span-1" icon={<Target />} title="RANKING">
-                        <div className="mt-2">
-                            <span className="text-2xl font-bold block">ELITE</span>
-                            <span className="text-[10px] text-accent font-mono">TOP 5% IN REGION</span>
-                        </div>
-                    </BentoCard>
-
-                    {/* Training Programs */}
-                    <div className="md:col-span-4 mt-8">
-                        <h2 className="font-mono text-xs uppercase tracking-widest text-muted mb-6 flex items-center gap-4">
-                            AVAILABLE MODULES <div className="h-[1px] flex-1 bg-white/10" />
-                        </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            {programs.map(prog => {
-                                const isActive = trainingProgress.some((tp: TrainingProgress) => tp.program_id === prog.id);
-                                return (
-                                    <button
-                                        key={prog.id}
-                                        onClick={() => setActiveProgramId(activeProgramId === prog.id ? null : prog.id)}
-                                        disabled={isActive}
-                                        className={cn(
-                                            "bento-card text-left p-6 transition-all",
-                                            isActive && "opacity-50 grayscale border-white/5",
-                                            activeProgramId === prog.id && "border-accent ring-1 ring-accent"
+                                    <div className="flex justify-end">
+                                        {tournament.status === 'upcoming' && (
+                                            <AnimatedButton variant="primary" className="text-xs">
+                                                참가 신청
+                                            </AnimatedButton>
                                         )}
-                                    >
-                                        <div className="text-2xl mb-4 text-accent">{prog.icon}</div>
-                                        <h3 className="font-bold text-sm mb-1">{prog.title}</h3>
-                                        <p className="text-[10px] text-muted uppercase tracking-tighter mb-4">{prog.weeks} WEEK PROGRAM</p>
-                                        {isActive ? (
-                                            <span className="text-[10px] font-mono text-accent">ALREADY INITIALIZED</span>
-                                        ) : (
-                                            <div className="flex items-center gap-1 text-[10px] font-mono text-muted group-hover:text-white transition-colors">
-                                                INITIALIZE <ChevronRight size={12} />
-                                            </div>
+                                        {tournament.status === 'ongoing' && (
+                                            <AnimatedButton variant="outline" className="text-xs">
+                                                <Play size={14} className="mr-1" />
+                                                경기 입장
+                                            </AnimatedButton>
                                         )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {activeProgramId && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="mt-6 flex justify-end"
-                            >
-                                <AnimatedButton
-                                    onClick={() => startProgram.mutate({
-                                        programId: activeProgramId,
-                                        programName: programs.find(p => p.id === activeProgramId)?.title || '',
-                                        weeks: programs.find(p => p.id === activeProgramId)?.weeks || 0
-                                    })}
-                                    disabled={startProgram.isPending}
-                                >
-                                    {startProgram.isPending ? 'INITIALIZING...' : 'START MODULE'}
-                                </AnimatedButton>
+                                        {tournament.status === 'completed' && (
+                                            <AnimatedButton variant="outline" className="text-xs">
+                                                결과 보기
+                                            </AnimatedButton>
+                                        )}
+                                    </div>
+                                </BentoCard>
                             </motion.div>
-                        )}
+                        ))}
                     </div>
 
-                    {/* Tournament Registration & List Side-by-Side */}
-                    <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-                        <BentoCard title="REGISTER MISSION" icon={<Plus />}>
-                            <div className="space-y-4 mt-4">
-                                <input
-                                    type="text"
-                                    value={tournamentName}
-                                    onChange={(e) => setTournamentName(e.target.value)}
-                                    placeholder="MISSION NAME"
-                                    className="w-full bg-white/5 border border-white/10 rounded px-4 py-3 font-mono text-xs focus:border-accent focus:outline-none transition-colors"
-                                />
-                                <input
-                                    type="date"
-                                    value={tournamentDate}
-                                    onChange={(e) => setTournamentDate(e.target.value)}
-                                    className="w-full bg-white/5 border border-white/10 rounded px-4 py-3 font-mono text-xs focus:border-accent focus:outline-none transition-colors"
-                                />
-                                <AnimatedButton
-                                    className="w-full"
-                                    onClick={() => registerTournament.mutate({
-                                        tournamentName,
-                                        tournamentDate,
-                                        programType: 'general'
-                                    })}
-                                    disabled={!tournamentName || !tournamentDate || registerTournament.isPending}
-                                >
-                                    LOG MISSION
-                                </AnimatedButton>
-                            </div>
-                        </BentoCard>
-
-                        <BentoCard title="MISSION ARCHIVE" icon={<Activity />}>
-                            <div className="space-y-2 mt-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                                {tournaments.map((t: Tournament) => (
-                                    <div key={t.id} className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded hover:border-white/20 transition-colors group">
-                                        <div className="flex flex-col">
-                                            <span className="font-mono text-xs uppercase group-hover:text-accent transition-colors">{t.tournament_name}</span>
-                                            <span className="text-[10px] text-muted">{new Date(t.tournament_date).toLocaleDateString()}</span>
+                    {/* Sidebar */}
+                    <div className="space-y-6">
+                        {/* Live Leaderboard */}
+                        <BentoCard className="p-6">
+                            <h2 className="font-display text-lg font-black uppercase italic mb-4 flex items-center gap-2">
+                                <Trophy size={18} className="text-yellow-400" />
+                                실시간 순위
+                            </h2>
+                            <div className="space-y-3">
+                                {leaderboard.map((entry) => (
+                                    <div key={entry.rank} className="flex items-center justify-between p-3 bg-white/5 rounded-xl">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-8 w-8 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+                                                {entry.icon}
+                                            </div>
+                                            <span className="font-bold">{entry.name}</span>
                                         </div>
-                                        <div className="text-[10px] font-mono px-2 py-0.5 border border-white/10 rounded">
-                                            {Math.ceil((new Date(t.tournament_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) > 0 ? 'PENDING' : 'COMPLETE'}
-                                        </div>
+                                        <span className="font-display text-lg font-black italic text-accent">{entry.score}</span>
                                     </div>
                                 ))}
-                                {tournaments.length === 0 && <p className="text-muted text-xs font-mono">NO MISSIONS LOGGED</p>}
+                            </div>
+                            <Link href="/team/leaderboard" className="mt-4 text-xs text-yellow-400 font-mono uppercase flex items-center justify-center gap-1 hover:underline">
+                                전체 순위 보기 <ChevronRight size={14} />
+                            </Link>
+                        </BentoCard>
+
+                        {/* Upcoming */}
+                        <BentoCard className="p-6">
+                            <h2 className="font-display text-lg font-black uppercase italic mb-4">다가오는 대회</h2>
+                            <div className="space-y-2">
+                                <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+                                    <p className="font-bold text-sm">신년 챔피언십</p>
+                                    <p className="text-xs text-muted">2025년 1월 1일</p>
+                                </div>
+                                <div className="p-3 bg-white/5 rounded-xl">
+                                    <p className="text-sm">프로암 토너먼트</p>
+                                    <p className="text-xs text-muted">2025년 1월 15일</p>
+                                </div>
                             </div>
                         </BentoCard>
                     </div>
                 </div>
+
+                {/* Create Modal */}
+                {showCreateModal && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-zinc-900 border border-white/10 rounded-2xl p-6 w-full max-w-md"
+                        >
+                            <h3 className="font-display text-xl font-black italic mb-6">토너먼트 생성</h3>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-mono uppercase text-muted mb-2 block">대회명</label>
+                                    <input
+                                        type="text"
+                                        placeholder="토너먼트 이름"
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-500/50"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-mono uppercase text-muted mb-2 block">유형</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-sm">개인전</button>
+                                        <button className="p-3 bg-white/5 border border-white/10 rounded-xl text-sm text-muted">팀전</button>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] font-mono uppercase text-muted mb-2 block">시작일</label>
+                                        <input type="date" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-mono uppercase text-muted mb-2 block">종료일</label>
+                                        <input type="date" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-mono uppercase text-muted mb-2 block">최대 참가자</label>
+                                    <input
+                                        type="number"
+                                        placeholder="32"
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <AnimatedButton variant="outline" className="flex-1" onClick={() => setShowCreateModal(false)}>
+                                    취소
+                                </AnimatedButton>
+                                <AnimatedButton variant="primary" className="flex-1">
+                                    생성하기
+                                </AnimatedButton>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
             </main>
         </div>
     );

@@ -34,15 +34,18 @@ export default function Navbar() {
     const isClub = userRole.startsWith('club');
 
     const navLinks = [
-        { name: '분석', href: '/dashboard' },
-        { name: 'AI 코치', href: '/coach' },
+        { name: '스윙 분석', href: '/swing-analysis' },
+        { name: '성능 기록', href: '/performance' },
+        { name: '훈련', href: '/training' },
         ...(isPaid ? [
-            { name: '1:1 레슨', href: '/lesson', highlight: true },
-            { name: '대회 코칭', href: '/tournament', highlight: true }
+            { name: '1:1 코칭', href: '/coaching', highlight: true },
+            { name: 'Veo 3D', href: '/veo-3d', highlight: true },
+            { name: '토너먼트', href: '/tournament', highlight: true }
         ] : []),
-        ...(isClub ? [{ name: '팀 대시보드', href: '/team', blue: true }] : []),
+        ...(isClub ? [{ name: '팀 대시보드', href: '/team/dashboard', blue: true }] : []),
         { name: '요금제', href: '/pricing' }
     ];
+
 
     return (
         <nav className={cn(

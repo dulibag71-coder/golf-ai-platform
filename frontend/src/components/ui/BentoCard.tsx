@@ -9,18 +9,23 @@ interface BentoCardProps {
     title?: string;
     subtitle?: string;
     icon?: React.ReactNode;
+    onClick?: () => void;
 }
 
-export default function BentoCard({ children, className, title, subtitle, icon }: BentoCardProps) {
+export default function BentoCard({ children, className, title, subtitle, icon, onClick }: BentoCardProps) {
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
+            onClick={onClick}
             className={cn(
                 "bento-card group flex flex-col gap-2",
+                onClick && "cursor-pointer",
                 className
             )}
+
         >
             {(title || icon) && (
                 <div className="flex items-center justify-between mb-2">

@@ -1,85 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-// OpenAI 클라이언트
-function getOpenAI() {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-        throw new Error('OPENAI_API_KEY is not set');
-    }
-    return new OpenAI({ apiKey });
-}
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+});
 
 export async function POST(request: NextRequest) {
     try {
-        const { message, history } = await request.json();
+        const { message, coachName, specialty } = await request.json();
 
         if (!message) {
-            return NextResponse.json({ error: '메시지를 입력해주세요.' }, { status: 400 });
+            return NextResponse.json({ error: '메시지가 필요합니다.' }, { status: 400 });
         }
 
-        const openai = getOpenAI();
+        const systemPrompt = `당신은 ${coachName}라는 이름의 전문 골프 코치입니다.
+전문 분야: ${specialty}
+경력: 10년 이상의 프로 코칭 경험
 
-        const systemPrompt = `당신은 20년 경력의 전문 골프 코치입니다. 이름은 "코치 김프로"입니다.
+당신의 역할:
+- 친근하고 전문적인 톤으로 대화
+- 골프 기술에 대한 구체적인 조언 제공
+- 학생의 수준에 맞춘 맞춤형 피드백
+- 동기 부여와 격려
+- 실용적이고 실행 가능한 팁 제공
 
-## 반드시 지켜야 할 규칙:
-1. 오직 골프에 관한 질문만 답변하세요
-2. 골프와 무관한 질문에는 "저는 골프 전문 코치입니다. 골프에 관한 질문을 해주세요! 😊"라고 답하세요
-3. 한국어로만 답변하세요
-4. 150자 이내로 간결하게 답변하세요
-
-## 전문 분야:
-- 스윙 기술 (드라이버, 아이언, 웨지, 퍼터)
-- 그립, 어드레스, 스탠스 자세
-- 비거리 향상 방법
-- 슬라이스, 훅, 뒤땅, 토핑 교정
-- 멘탈 관리 및 코스 전략
-- 연습 방법 및 훈련 루틴
-- 골프 장비 추천
-
-## 답변 스타일:
-- 친근하고 격려하는 톤
-- 구체적이고 실용적인 조언
-- 필요시 숫자와 각도로 설명 (예: "어깨 회전 90도")
-- 이모지를 적절히 사용`;
-
-        const messages: any[] = [
-            { role: 'system', content: systemPrompt }
-        ];
-
-        // 이전 대화 히스토리 추가 (최근 5개만)
-        if (history && Array.isArray(history)) {
-            const recentHistory = history.slice(-5);
-            recentHistory.forEach((h: any) => {
-                messages.push({
-                    role: h.role === 'ai' ? 'assistant' : 'user',
-                    content: h.content
-                });
-            });
-        }
-
-        messages.push({ role: 'user', content: message });
+응답 규칙:
+- 한국어로 자연스럽게 대화
+- 2-3문장 정도로 간결하게 답변
+- 필요시 연습 방법 제안
+- 긍정적이고 격려하는 톤 유지`;
 
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
-            messages,
-            max_tokens: 200,
-            temperature: 0.7
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: message }
+            ],
+            temperature: 0.7,
+            max_tokens: 500,
         });
 
-        const aiResponse = completion.choices[0].message.content;
+        const response = completion.choices[0]?.message?.content || '죄송합니다, 잠시 후 다시 시도해주세요.';
 
-        return NextResponse.json({
-            message: aiResponse,
-            role: 'ai'
-        });
+        return NextResponse.json({ response });
+
     } catch (error: any) {
-        console.error('Coach API error:', error);
-
-        // 에러 시 기본 응답
-        return NextResponse.json({
-            message: '죄송합니다, 잠시 연결에 문제가 있습니다. 다시 질문해주세요! 🏌️',
-            role: 'ai'
-        });
+        console.error('Coach chat error:', error);
+        return NextResponse.json(
+            { error: error.message || '채팅 중 오류가 발생했습니다.' },
+            { status: 500 }
+        );
     }
 }
