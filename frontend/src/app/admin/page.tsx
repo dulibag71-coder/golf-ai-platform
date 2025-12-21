@@ -66,21 +66,27 @@ export default function AdminDashboard() {
         const loadData = async () => {
             try {
                 const token = localStorage.getItem('token');
-                if (!token) return;
 
-                const [paymentsData, usersData, statsData] = await Promise.all([
-                    api.get('/admin/payments/pending', token).catch(() => []),
-                    api.get('/admin/users', token).catch(() => []),
-                    api.get('/admin/stats', token).catch(() => ({ totalUsers: 0, pendingPayments: 0, revenue: 0, totalSwings: 0 }))
+                // Use Next.js API routes directly
+                const [paymentsRes, usersRes, statsRes] = await Promise.all([
+                    fetch('/api/admin/payments', {
+                        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                    }).then(r => r.ok ? r.json() : []).catch(() => []),
+                    fetch('/api/admin/users', {
+                        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                    }).then(r => r.ok ? r.json() : []).catch(() => []),
+                    fetch('/api/admin/stats', {
+                        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                    }).then(r => r.ok ? r.json() : ({ totalUsers: 0, pendingPayments: 0, revenue: 0, totalSwings: 0 })).catch(() => ({ totalUsers: 0, pendingPayments: 0, revenue: 0, totalSwings: 0 }))
                 ]);
 
-                setPayments(paymentsData || []);
-                setUsers(usersData || []);
+                setPayments(paymentsRes || []);
+                setUsers(usersRes || []);
                 setStats({
-                    totalUsers: statsData.totalUsers || 0,
-                    totalSwings: statsData.totalSwings || 0,
-                    pendingPayments: statsData.pendingPayments || 0,
-                    revenue: statsData.revenue || 0
+                    totalUsers: statsRes.totalUsers || 0,
+                    totalSwings: statsRes.totalSwings || 0,
+                    pendingPayments: statsRes.pendingPayments || 0,
+                    revenue: statsRes.revenue || 0
                 });
             } catch (error) {
                 console.error('Data load error:', error);
@@ -106,10 +112,19 @@ export default function AdminDashboard() {
     const handleApprove = async (paymentId: number) => {
         try {
             const token = localStorage.getItem('token');
-            await api.post('/admin/payments/approve', { paymentId }, token || '');
-            setPayments(payments.filter(p => p.id !== paymentId));
-            setStats(prev => ({ ...prev, pendingPayments: prev.pendingPayments - 1 }));
-            // Success notification logic could go here
+            const res = await fetch('/api/admin/payments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ paymentId })
+            });
+
+            if (res.ok) {
+                setPayments(payments.filter(p => p.id !== paymentId));
+                setStats(prev => ({ ...prev, pendingPayments: prev.pendingPayments - 1 }));
+            }
         } catch (e) {
             console.error('Approval failed:', e);
         }
