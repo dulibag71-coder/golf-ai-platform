@@ -224,8 +224,14 @@ export default function PaymentPage() {
                             </div>
 
                             {error && (
-                                <div className="flex items-center gap-2 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 font-mono text-[10px]">
-                                    <AlertCircle size={14} /> ERRORCODE: {error}
+                                <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 font-mono text-xs">
+                                    <AlertCircle size={16} />
+                                    <span>
+                                        {error === 'SENDER_NAME_REQUIRED' ? '담당자 이름을 입력해주세요.' :
+                                            error === 'SQUAD_NAME_REQUIRED' ? '팀 이름을 입력해주세요.' :
+                                                error.includes('fetch') ? '서버 연결에 실패했습니다. 다시 시도해주세요.' :
+                                                    '결제 요청 중 오류가 발생했습니다.'}
+                                    </span>
                                 </div>
                             )}
 
