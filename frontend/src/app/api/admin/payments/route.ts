@@ -30,13 +30,32 @@ export async function GET() {
 // 플랜명에 따른 role 매핑
 function getPlanRole(planName: string): string {
     const roleMap: Record<string, string> = {
+        // 개인용 플랜
         '프로': 'pro',
+        '프로 코어': 'pro',
         '엘리트': 'elite',
+        '엘리트 커맨드': 'elite',
+        // 팀/클럽 플랜
         '동호회 스타터': 'club_starter',
         '동호회 프로': 'club_pro',
-        '동호회 엔터프라이즈': 'club_enterprise'
+        '동호회 엔터프라이즈': 'club_enterprise',
+        '팀 스타터': 'club_starter',
+        '얼라이언스 프로': 'club_pro',
     };
-    return roleMap[planName] || 'pro';
+
+    // 대소문자 무시하고 매핑
+    const normalizedPlan = planName?.toLowerCase() || '';
+    for (const [key, value] of Object.entries(roleMap)) {
+        if (normalizedPlan.includes(key.toLowerCase()) || key.toLowerCase().includes(normalizedPlan)) {
+            return value;
+        }
+    }
+
+    // 기본값: 엘리트인 경우 elite, 그 외 pro
+    if (normalizedPlan.includes('엘리트') || normalizedPlan.includes('elite')) {
+        return 'elite';
+    }
+    return 'pro';
 }
 
 // 결제 승인 + 이메일 발송
