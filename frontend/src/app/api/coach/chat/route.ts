@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+const getOpenAIClient = () => {
+    return new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY || '',
+    });
+};
 
 export async function POST(request: NextRequest) {
     try {
@@ -29,6 +31,8 @@ export async function POST(request: NextRequest) {
 - 2-3문장 정도로 간결하게 답변
 - 필요시 연습 방법 제안
 - 긍정적이고 격려하는 톤 유지`;
+
+        const openai = getOpenAIClient();
 
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',

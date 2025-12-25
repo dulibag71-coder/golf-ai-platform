@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { getDb } from '@/lib/db';
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+const getOpenAIClient = () => {
+    return new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY || '',
+    });
+};
 
 export async function POST(request: NextRequest) {
     try {
@@ -42,6 +44,8 @@ export async function POST(request: NextRequest) {
 }
 
 JSON만 반환하세요.`;
+
+        const openai = getOpenAIClient();
 
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
