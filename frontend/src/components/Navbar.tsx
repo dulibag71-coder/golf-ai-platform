@@ -7,21 +7,81 @@ import AnimatedButton from './ui/AnimatedButton';
 import { cn } from '@/lib/utils';
 
 export default function Navbar() {
-    const [token, setToken] = useState<string | null>(null);
+    const [user, setUser] = useState<any>(null);
     const [userRole, setUserRole] = useState<string>('user');
+    const [isPaid, setIsPaid] = useState(false);
+    const [isClub, setIsClub] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
+    const [showNotification, setShowNotification] = useState(false);
+
+    const refreshUser = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setUser(null);
+                setUserRole('user');
+                setIsPaid(false);
+                setIsClub(false);
+                return;
+            }
+
+            const res = await fetch('/api/auth/me', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const prevUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+                // If role changed (upgraded), show notification
+                if (prevUser.role && data.role && prevUser.role !== data.role) {
+                    setShowNotification(true);
+                    setTimeout(() => setShowNotification(false), 8000);
+                }
+
+                localStorage.setItem('user', JSON.stringify(data));
+                setUser(data);
+                setUserRole(data.role || 'user');
+                setIsPaid(['pro', 'elite', 'admin'].includes(data.role));
+                setIsClub(['club_starter', 'club_pro', 'club_enterprise', 'admin'].includes(data.role));
+            } else {
+                // If token is invalid or expired, clear local storage
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                setUser(null);
+                setUserRole('user');
+                setIsPaid(false);
+                setIsClub(false);
+            }
+        } catch (e) {
+            console.error('Navbar profile refresh failed:', e);
+        }
+    };
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            setToken(localStorage.getItem('token'));
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            setUserRole(user.role || 'user');
-        }
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            if (storedUser.id) {
+                setUser(storedUser);
+                setUserRole(storedUser.role || 'user');
+                setIsPaid(['pro', 'elite', 'admin'].includes(storedUser.role));
+                setIsClub(['club_starter', 'club_pro', 'club_enterprise', 'admin'].includes(storedUser.role));
+            }
 
-        const handleScroll = () => setScrolled(window.scrollY > 20);
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
+            // Initial refresh
+            refreshUser();
+
+            // Periodic refresh every 5 minutes
+            const interval = setInterval(refreshUser, 1000 * 60 * 5);
+
+            const handleScroll = () => setScrolled(window.scrollY > 20);
+            window.addEventListener('scroll', handleScroll);
+
+            return () => {
+                clearInterval(interval);
+                window.removeEventListener('scroll', handleScroll);
+            };
+        }
     }, []);
 
     const handleLogout = () => {
@@ -30,8 +90,7 @@ export default function Navbar() {
         window.location.href = '/login';
     };
 
-    const isPaid = userRole !== 'user';
-    const isClub = userRole.startsWith('club');
+    // Removed duplicate isPaid/isClub declarations. They are now state variables.
 
     const navLinks = [
         { name: '스윙 분석', href: '/swing-analysis' },
@@ -43,6 +102,7 @@ export default function Navbar() {
             { name: '토너먼트', href: '/tournament', highlight: true }
         ] : []),
         ...(isClub ? [{ name: '팀 대시보드', href: '/team/dashboard', blue: true }] : []),
+        ...(userRole === 'admin' ? [{ name: '시스템 관리', href: '/admin', highlight: true }] : []),
         { name: '요금제', href: '/pricing' }
     ];
 
@@ -80,7 +140,17 @@ export default function Navbar() {
                     </div>
 
                     <div className="hidden md:flex items-center space-x-6">
-                        {token ? (
+                        {showNotification && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.5 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="flex items-center gap-2 px-3 py-1 bg-accent/20 border border-accent/40 rounded-full"
+                            >
+                                <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse" />
+                                <span className="text-[9px] font-black text-accent uppercase tracking-tighter italic">UPGRADED</span>
+                            </motion.div>
+                        )}
+                        {user ? (
                             <div className="flex items-center gap-4">
                                 {isPaid && (
                                     <span className="font-mono text-[10px] px-2 py-0.5 border border-accent/30 text-accent rounded uppercase">
@@ -140,7 +210,7 @@ export default function Navbar() {
                                 </Link>
                             ))}
                             <div className="pt-4 border-t border-white/5 space-y-4">
-                                {token ? (
+                                {user ? (
                                     <>
                                         <Link href="/profile" onClick={() => setMenuOpen(false)}>
                                             <AnimatedButton className="w-full">MY DASHBOARD</AnimatedButton>

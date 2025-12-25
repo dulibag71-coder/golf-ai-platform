@@ -32,10 +32,23 @@ export default function FeatureGate({ children, requiredRoles = [], featureName 
             // Get user from localStorage
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             const role = user.role || 'user';
+            const expiresAt = user.subscription_expires_at;
             setUserRole(role);
 
+            // Check if subscription has expired
+            let isExpired = false;
+            if (expiresAt && role !== 'admin' && role !== 'user') {
+                const expiryDate = new Date(expiresAt);
+                const now = new Date();
+                if (now > expiryDate) {
+                    isExpired = true;
+                }
+            }
+
             // Check access
-            if (requiredRoles.length === 0) {
+            if (isExpired) {
+                setHasAccess(false);
+            } else if (requiredRoles.length === 0) {
                 // No specific role required
                 setHasAccess(true);
             } else if (role === 'admin') {

@@ -20,11 +20,22 @@ export async function GET() {
         // 총 스윙 분석 수
         const swingCount = await sql`SELECT COUNT(*) as count FROM swing_analyses`;
 
+        // 요금제별 그룹화 데이터
+        const distribution = await sql`
+            SELECT role, COUNT(*) as value 
+            FROM users 
+            GROUP BY role
+        `;
+
         return NextResponse.json({
             totalUsers: parseInt(userCount[0]?.count) || 0,
             pendingPayments: parseInt(pendingPayments[0]?.count) || 0,
             revenue: parseInt(revenue[0]?.total) || 0,
-            totalSwings: parseInt(swingCount[0]?.count) || 0
+            totalSwings: parseInt(swingCount[0]?.count) || 0,
+            distribution: distribution.map(d => ({
+                name: d.role.toUpperCase(),
+                value: parseInt(d.value)
+            }))
         });
     } catch (error: any) {
         console.error('Get stats error:', error);

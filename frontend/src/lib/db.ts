@@ -111,4 +111,16 @@ export async function initializeDatabase() {
             joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `;
+
+    // 채팅 메시지 테이블
+    await sql`
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER,
+            user_name VARCHAR(100),
+            user_role VARCHAR(20),
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `;
 }

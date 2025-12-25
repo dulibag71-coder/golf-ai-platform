@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
         const userId = decoded.userId;
 
         const sql = getDb();
-        const users = await sql`SELECT id, email, name, role, created_at FROM users WHERE id = ${userId}`;
+        const users = await sql`SELECT id, email, name, role, subscription_expires_at, created_at FROM users WHERE id = ${userId}`;
 
         if (users.length === 0) {
             return NextResponse.json({ error: '사용자를 찾을 수 없습니다.' }, { status: 404 });
